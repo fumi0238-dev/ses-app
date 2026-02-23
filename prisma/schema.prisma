@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Project {
+  id                        String     @id @default(uuid())
+  status                    String?
+  shareable                 String?
+  share_note                String?
+  added_date                String?
+  source                    String?
+  project_name_original     String?
+  project_name_rewrite      String?
+  client_price              String?
+  purchase_price            String?
+  purchase_price_num        Float?
+  role                      String?
+  location                  String?
+  work_style                String?
+  period                    String?
+  headcount                 String?
+  required_skills           String?
+  preferred_skills          String?
+  required_skill_tags       String?
+  preferred_skill_tags      String?
+  industry_tags             String?
+  required_experience_years Float?
+  description_original      String?
+  description_rewrite       String?
+  age_limit                 String?
+  nationality               String?
+  english                   String?
+  commercial_flow           String?
+  interview_count           String?
+  created_at                BigInt     @default(0)
+  updated_at                BigInt     @default(0)
+  deleted                   Boolean    @default(false)
+  matchings                 Matching[]
+
+  @@map("projects")
+}
+
+model Member {
+  id                 String     @id @default(uuid())
+  process            String?
+  affiliation        String?
+  full_name          String?
+  initial            String?
+  contract_employee  String?
+  desired_price      String?
+  desired_price_num  Float?
+  contact            String?
+  desired_position   String?
+  skill_sheet_url    String?
+  proposal_text      String?
+  sales_comment      String?
+  skills_summary     String?
+  skill_tags         String?
+  industry_tags      String?
+  experience_years   Float?
+  experience_summary String?
+  nearest_station    String?
+  available_date     String?
+  work_preference    String?
+  created_at         BigInt     @default(0)
+  updated_at         BigInt     @default(0)
+  deleted            Boolean    @default(false)
+  matchings          Matching[]
+
+  @@map("members")
+}
+
+model Matching {
+  id             String  @id @default(uuid())
+  project_id     String
+  member_id      String
+  status         String?
+  note           String?
+  proposed_date  String?
+  interview_date String?
+  created_at     BigInt  @default(0)
+  updated_at     BigInt  @default(0)
+  deleted        Boolean @default(false)
+  project        Project @relation(fields: [project_id], references: [id])
+  member         Member  @relation(fields: [member_id], references: [id])
+  tasks          Task[]
+
+  @@map("matchings")
+}
+
+model Task {
+  id              String  @id @default(uuid())
+  matching_id     String
+  content         String?
+  done            Boolean @default(false)
+  due_date        String?
+  sort_order      Int     @default(0)
+  progress_status String  @default("未着手")
+  progress_note   String?
+  assignee        String?
+  created_at      BigInt  @default(0)
+  updated_at      BigInt  @default(0)
+  matching        Matching @relation(fields: [matching_id], references: [id])
+
+  @@map("tasks")
+}
+
+model ActivityLog {
+  id           String @id @default(uuid())
+  action       String?
+  target_table String?
+  target_id    String?
+  target_name  String?
+  detail       String?
+  timestamp    String?
+  created_at   BigInt @default(0)
+
+  @@map("activity_logs")
+}
+
+model Note {
+  id           String @id @default(uuid())
+  target_table String?
+  target_id    String?
+  content      String?
+  timestamp    String?
+  created_at   BigInt @default(0)
+
+  @@map("notes")
+}

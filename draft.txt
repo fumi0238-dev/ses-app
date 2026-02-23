@@ -1,0 +1,3767 @@
+（draft.txtの記述例）
+
+【要件・README】
+# SES案件マッチング管理ツール
+
+ReForce株式会社 SES営業部向けの案件・人材マッチング管理Webアプリ。
+
+## メインURI
+
+- `index.html` — SPA（シングルページアプリケーション）
+
+## 実装済み機能
+
+### ダッシュボード
+- KPIカード（Open案件数・要員数・マッチング数・共有可能案件数）
+- 最近追加された案件一覧
+- 案件検索中の要員一覧
+
+### 案件管理
+- 案件一覧テーブル（ステータス・共有・追加日・案件名・職種・勤務地・働き方・仕入単価・案件元・提案件数）
+- 検索・フィルタ（共有可否・働き方）
+- CRUD（追加・編集・削除）
+- 詳細モーダル（紐付き要員一覧付き）
+- スキルタグ（必須/尚可）・業界タグ・必要経験年数・仕入単価(数値)
+
+### 要員管理
+- 要員カード表示（スキルタグ・提案中案件バッジ付き）
+- 検索
+- CRUD（追加・編集・削除）
+- 詳細モーダル（紐付き案件一覧付き）
+- スキルタグ・業界タグ・経験年数・希望単価(数値)
+
+### マッチング
+- 案件選択 → 自動候補提示（スコア順）
+- マッチング登録・編集・削除
+- マッチング履歴テーブル
+
+### マッチングロジック（v3）
+| 要素 | 配点 |
+|---|---|
+| 必須スキルタグ完全一致 | +3点/件 |
+| 必須スキル類似一致 | +1.5点/件 |
+| 尚可スキルタグ完全一致 | +1点/件 |
+| 尚可スキル類似一致 | +0.5点/件 |
+| 業界タグ一致 | +2点/件 |
+| ポジション一致 | +2点 |
+| 経験年数充足 | +1点 / 不足時 -1点 |
+| 単価余裕あり(10万以上) | +1点 / 超過時 -2点 |
+| フォールバック(タグ未設定時) | 最大+5点 |
+
+- 既提案要員は半透明+「提案済」表示、登録ボタン非表示
+- 必須スキルカバー率を%表示（色分け）
+- 単価差額・経験年数不足を警告表示
+
+### 類似スキルグループ（36グループ定義）
+Java≒Kotlin, JavaScript≒TypeScript, AWS, Azure, GCP, Docker≒k8s, PM/PL/SE 等
+
+### データインポート（4方式）
+- Excel (.xlsx/.xls) ドラッグ&ドロップ
+- CSV (.csv/.tsv) ドラッグ&ドロップ
+- JSON テキスト貼り付け（テンプレートコピー機能付き）
+- テキスト貼り付け（タブ/カンマ区切り）
+- 自動カラムマッピング（完全一致）
+- プレビュー・追加/置換モード
+
+## データモデル
+
+### projects (29フィールド)
+id, status, shareable, share_note, added_date, source, project_name_original, project_name_rewrite, client_price, purchase_price, **purchase_price_num**, role, location, work_style, period, headcount, required_skills, preferred_skills, **required_skill_tags**, **preferred_skill_tags**, **industry_tags**, **required_experience_years**, description_original, description_rewrite, age_limit, nationality, english, commercial_flow, interview_count
+
+### members (21フィールド)
+id, process, affiliation, full_name, initial, contract_employee, desired_price, **desired_price_num**, contact, desired_position, skill_sheet_url, proposal_text, sales_comment, skills_summary, **skill_tags**, **industry_tags**, **experience_years**, experience_summary, nearest_station, available_date, work_preference
+
+### matchings (7フィールド)
+id, project_id, member_id, status, note, proposed_date, interview_date
+
+## 技術スタック
+- HTML5 / CSS3 / Vanilla JavaScript
+- SheetJS (xlsx) — Excelインポート
+- Font Awesome — アイコン
+- Google Fonts (Noto Sans JP, Inter)
+- RESTful Table API — データ永続化
+
+## 増井さん側の保留タスク
+- [ ] 既存案件データに `required_skill_tags`, `preferred_skill_tags`, `industry_tags`, `purchase_price_num`, `required_experience_years` を追記
+- [ ] 既存要員データに `skill_tags`, `industry_tags`, `experience_years`, `desired_price_num` を追記
+- [ ] 単価データを数値比較可能な形式に統一（例: 70 = 70万円）
+
+## 今後の拡張候補
+- リモート希望マッチング（保留中）
+- マッチング結果の学習（将来）
+- 粗利・インセンティブ自動計算
+- カレンダー連携
+- 通知機能
+
+
+【HTML】
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SES案件マッチング管理 | ReForce</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-bolt"></i>
+                <span>ReForce SES</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <i class="fas fa-chart-pie"></i>
+                <span>ダッシュボード</span>
+            </a>
+            <a href="#" class="nav-item" data-page="projects">
+                <i class="fas fa-briefcase"></i>
+                <span>案件管理</span>
+            </a>
+            <a href="#" class="nav-item" data-page="members">
+                <i class="fas fa-users"></i>
+                <span>要員管理</span>
+            </a>
+            <a href="#" class="nav-item" data-page="matching">
+                <i class="fas fa-handshake"></i>
+                <span>マッチング</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+                <div class="user-detail">
+                    <span class="user-name">増井</span>
+                    <span class="user-role">Sales Manager</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="page-title" id="pageTitle">ダッシュボード</h1>
+            <div class="header-actions">
+                <span class="current-date" id="currentDate"></span>
+            </div>
+        </header>
+
+        <!-- Dashboard Page -->
+        <div class="page active" id="page-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="fas fa-briefcase"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-projects">-</span>
+                        <span class="stat-label">Open案件</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="fas fa-users"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-members">-</span>
+                        <span class="stat-label">要員数</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="fas fa-handshake"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-matchings">-</span>
+                        <span class="stat-label">マッチング</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="stat-shareable">-</span>
+                        <span class="stat-label">共有可能案件</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-clock"></i> 最近追加された案件</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="recent-projects" class="recent-list"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-users"></i> 案件検索中の要員</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="searching-members" class="recent-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-grid mt-20">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-bar"></i> 案件ステータス分布</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="height:250px;"><canvas id="chart-project-status"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-pie"></i> マッチング状況</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="height:250px;"><canvas id="chart-matching-status"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h3><i class="fas fa-stream"></i> アクティビティログ</h3>
+                </div>
+                <div class="card-body">
+                    <div id="activity-log-list" class="recent-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Page -->
+        <div class="page" id="page-projects">
+            <div class="page-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="project-search" placeholder="案件名・スキル・勤務地で検索...">
+                </div>
+                <div class="filter-group">
+                    <select id="filter-shareable">
+                        <option value="">共有可否: すべて</option>
+                        <option value="OK">共有OK</option>
+                        <option value="NG">共有NG</option>
+                    </select>
+                    <select id="filter-workstyle">
+                        <option value="">働き方: すべて</option>
+                        <option value="オンサイト">オンサイト</option>
+                        <option value="リモート併用">リモート併用</option>
+                        <option value="フルリモート">フルリモート</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="btn-add-project">
+                    <i class="fas fa-plus"></i> 案件追加
+                </button>
+                <button class="btn btn-secondary" id="btn-import-project">
+                    <i class="fas fa-file-import"></i> インポート
+                </button>
+                <button class="btn btn-secondary" id="btn-export-project">
+                    <i class="fas fa-file-export"></i> エクスポート
+                </button>
+            </div>
+            <div class="bulk-action-bar" id="project-bulk-bar" style="display:none;">
+                <span class="bulk-count"><span id="project-bulk-count">0</span>件選択中</span>
+                <select id="project-bulk-status">
+                    <option value="">ステータス変更...</option>
+                    <option value="Open">Open</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Hold">Hold</option>
+                </select>
+                <select id="project-bulk-shareable">
+                    <option value="">共有可否変更...</option>
+                    <option value="OK">OK</option>
+                    <option value="NG">NG</option>
+                </select>
+                <button class="btn btn-sm btn-primary" id="btn-project-bulk-apply"><i class="fas fa-check"></i> 適用</button>
+                <button class="btn btn-sm btn-secondary" id="btn-project-bulk-cancel"><i class="fas fa-times"></i> 解除</button>
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="projects-table">
+                    <thead>
+                        <tr>
+                            <th class="th-check"><input type="checkbox" id="project-check-all"></th>
+                            <th class="sortable" data-sort="status">ステータス <i class="fas fa-sort"></i></th>
+                            <th>共有</th>
+                            <th class="sortable" data-sort="added_date">追加日 <i class="fas fa-sort"></i></th>
+                            <th class="sortable" data-sort="project_name">案件名 <i class="fas fa-sort"></i></th>
+                            <th>募集職種</th>
+                            <th>勤務地</th>
+                            <th>働き方</th>
+                            <th class="sortable" data-sort="purchase_price_num">仕入単価 <i class="fas fa-sort"></i></th>
+                            <th>案件元</th>
+                            <th class="sortable" data-sort="match_count">提案 <i class="fas fa-sort"></i></th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="projects-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Members Page -->
+        <div class="page" id="page-members">
+            <div class="page-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="member-search" placeholder="名前・スキル・ポジションで検索...">
+                </div>
+                <button class="btn btn-primary" id="btn-add-member">
+                    <i class="fas fa-plus"></i> 要員追加
+                </button>
+                <button class="btn btn-secondary" id="btn-import-member">
+                    <i class="fas fa-file-import"></i> インポート
+                </button>
+                <button class="btn btn-secondary" id="btn-export-member">
+                    <i class="fas fa-file-export"></i> エクスポート
+                </button>
+            </div>
+            <div class="members-grid" id="members-grid"></div>
+        </div>
+
+        <!-- Matching Page -->
+        <div class="page" id="page-matching">
+            <div class="matching-layout">
+                <div class="matching-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-briefcase"></i> 案件を選択</h3>
+                    </div>
+                    <div class="panel-body">
+                        <select id="matching-project-select" class="full-select">
+                            <option value="">-- 案件を選択 --</option>
+                        </select>
+                        <div id="selected-project-detail" class="detail-box"></div>
+                    </div>
+                </div>
+                <div class="matching-center">
+                    <button class="btn btn-match" id="btn-do-match" disabled>
+                        <i class="fas fa-magic"></i>
+                        <span>マッチング実行</span>
+                    </button>
+                </div>
+                <div class="matching-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-users"></i> 候補要員</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div id="matching-results" class="matching-results"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-20">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> マッチング履歴</h3>
+                </div>
+                <div class="card-body">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>案件名</th>
+                                <th>要員名</th>
+                                <th>ステータス</th>
+                                <th>提案日</th>
+                                <th>面談日</th>
+                                <th>メモ</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matchings-tbody"></tbody>
+                    </table>
+                    <div class="matching-legend">
+                        <span class="legend-item"><span class="badge badge-candidate">候補</span></span>
+                        <span class="legend-item"><span class="badge badge-proposed">提案中</span></span>
+                        <span class="legend-item"><span class="badge badge-interviewing">面談調整中</span></span>
+                        <span class="legend-item"><span class="badge badge-interviewed">面談済</span></span>
+                        <span class="legend-item"><span class="badge badge-offered">内定</span></span>
+                        <span class="legend-item"><span class="badge badge-decided">参画決定</span></span>
+                        <span class="legend-item"><span class="badge badge-rejected">見送り</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Project Detail Modal -->
+    <div class="modal-overlay" id="modal-project-detail">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 id="modal-project-title">案件詳細</h2>
+                <button class="modal-close" data-close="modal-project-detail"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="modal-project-body"></div>
+        </div>
+    </div>
+
+    <!-- Member Detail Modal -->
+    <div class="modal-overlay" id="modal-member-detail">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 id="modal-member-title">要員詳細</h2>
+                <button class="modal-close" data-close="modal-member-detail"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="modal-member-body"></div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Project Modal -->
+    <div class="modal-overlay" id="modal-project-form">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 id="project-form-title">案件追加</h2>
+                <button class="modal-close" data-close="modal-project-form"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="project-form">
+                    <input type="hidden" id="pf-id">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>ステータス</label>
+                            <select id="pf-status"><option value="Open">Open</option><option value="Closed">Closed</option><option value="Hold">Hold</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>共有可否</label>
+                            <select id="pf-shareable"><option value="OK">OK</option><option value="NG">NG</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>共有NG理由</label>
+                            <input type="text" id="pf-share_note">
+                        </div>
+                        <div class="form-group">
+                            <label>追加日</label>
+                            <input type="text" id="pf-added_date" placeholder="YYYY/MM/DD">
+                        </div>
+                        <div class="form-group">
+                            <label>案件元/ツール</label>
+                            <input type="text" id="pf-source">
+                        </div>
+                        <div class="form-group">
+                            <label>募集職種</label>
+                            <input type="text" id="pf-role">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>案件名(原文)</label>
+                            <input type="text" id="pf-project_name_original">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>案件名(リライト)</label>
+                            <input type="text" id="pf-project_name_rewrite">
+                        </div>
+                        <div class="form-group">
+                            <label>元単価</label>
+                            <input type="text" id="pf-client_price">
+                        </div>
+                        <div class="form-group">
+                            <label>仕入単価</label>
+                            <input type="text" id="pf-purchase_price">
+                        </div>
+                        <div class="form-group">
+                            <label>仕入単価（数値・万円）</label>
+                            <input type="number" id="pf-purchase_price_num" placeholder="70">
+                        </div>
+                        <div class="form-group">
+                            <label>必要経験年数</label>
+                            <input type="number" id="pf-required_experience_years" placeholder="3" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>勤務地</label>
+                            <input type="text" id="pf-location">
+                        </div>
+                        <div class="form-group">
+                            <label>働き方</label>
+                            <input type="text" id="pf-work_style" placeholder="オンサイト/リモート併用/フルリモート">
+                        </div>
+                        <div class="form-group">
+                            <label>期間</label>
+                            <input type="text" id="pf-period">
+                        </div>
+                        <div class="form-group">
+                            <label>募集人数</label>
+                            <input type="text" id="pf-headcount">
+                        </div>
+                        <div class="form-group">
+                            <label>年齢制限</label>
+                            <input type="text" id="pf-age_limit">
+                        </div>
+                        <div class="form-group">
+                            <label>外国籍</label>
+                            <input type="text" id="pf-nationality">
+                        </div>
+                        <div class="form-group">
+                            <label>英語</label>
+                            <input type="text" id="pf-english">
+                        </div>
+                        <div class="form-group">
+                            <label>商流制限</label>
+                            <input type="text" id="pf-commercial_flow">
+                        </div>
+                        <div class="form-group">
+                            <label>面談回数</label>
+                            <input type="text" id="pf-interview_count">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>必須スキルタグ <span class="tag-hint">Enterで追加 / クリックで削除</span></label>
+                            <div class="tag-input-wrap" id="pf-required_skill_tags-wrap">
+                                <div class="tag-list" id="pf-required_skill_tags-tags"></div>
+                                <input type="text" class="tag-input" id="pf-required_skill_tags-input" placeholder="Java, AWS, PM 等を入力...">
+                            </div>
+                            <input type="hidden" id="pf-required_skill_tags">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>尚可スキルタグ <span class="tag-hint">Enterで追加 / クリックで削除</span></label>
+                            <div class="tag-input-wrap" id="pf-preferred_skill_tags-wrap">
+                                <div class="tag-list" id="pf-preferred_skill_tags-tags"></div>
+                                <input type="text" class="tag-input" id="pf-preferred_skill_tags-input" placeholder="尚可スキルを入力...">
+                            </div>
+                            <input type="hidden" id="pf-preferred_skill_tags">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>必須スキル（原文メモ）</label>
+                            <textarea id="pf-required_skills" rows="2"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>尚可スキル（原文メモ）</label>
+                            <textarea id="pf-preferred_skills" rows="2"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>業界タグ <span class="tag-hint">Enterで追加 / クリックで削除</span></label>
+                            <div class="tag-input-wrap" id="pf-industry_tags-wrap">
+                                <div class="tag-list" id="pf-industry_tags-tags"></div>
+                                <input type="text" class="tag-input" id="pf-industry_tags-input" placeholder="金融, 官公庁, EC 等を入力...">
+                            </div>
+                            <input type="hidden" id="pf-industry_tags">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-close="modal-project-form">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Member Modal -->
+    <div class="modal-overlay" id="modal-member-form">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2 id="member-form-title">要員追加</h2>
+                <button class="modal-close" data-close="modal-member-form"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="member-form">
+                    <input type="hidden" id="mf-id">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>プロセス</label>
+                            <select id="mf-process">
+                                <option value="案件検索中">案件検索中</option>
+                                <option value="提案中">提案中</option>
+                                <option value="面談調整中">面談調整中</option>
+                                <option value="面談済">面談済</option>
+                                <option value="内定">内定</option>
+                                <option value="参画中">参画中</option>
+                                <option value="終了">終了</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>所属先/経由元</label>
+                            <input type="text" id="mf-affiliation">
+                        </div>
+                        <div class="form-group">
+                            <label>要員名（本名）</label>
+                            <input type="text" id="mf-full_name">
+                        </div>
+                        <div class="form-group">
+                            <label>イニシャル</label>
+                            <input type="text" id="mf-initial">
+                        </div>
+                        <div class="form-group">
+                            <label>契約社員化</label>
+                            <input type="text" id="mf-contract_employee">
+                        </div>
+                        <div class="form-group">
+                            <label>希望単価</label>
+                            <input type="text" id="mf-desired_price">
+                        </div>
+                        <div class="form-group">
+                            <label>希望単価（数値・万円）</label>
+                            <input type="number" id="mf-desired_price_num" placeholder="60">
+                        </div>
+                        <div class="form-group">
+                            <label>経験年数</label>
+                            <input type="number" id="mf-experience_years" placeholder="5" min="0">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>連絡先</label>
+                            <input type="text" id="mf-contact">
+                        </div>
+                        <div class="form-group">
+                            <label>希望ポジション</label>
+                            <input type="text" id="mf-desired_position">
+                        </div>
+                        <div class="form-group">
+                            <label>最寄駅</label>
+                            <input type="text" id="mf-nearest_station">
+                        </div>
+                        <div class="form-group">
+                            <label>稼働可能日</label>
+                            <input type="text" id="mf-available_date">
+                        </div>
+                        <div class="form-group">
+                            <label>勤務形態希望</label>
+                            <input type="text" id="mf-work_preference">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>スキルシートURL</label>
+                            <input type="text" id="mf-skill_sheet_url">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>スキルタグ <span class="tag-hint">Enterで追加 / クリックで削除</span></label>
+                            <div class="tag-input-wrap" id="mf-skill_tags-wrap">
+                                <div class="tag-list" id="mf-skill_tags-tags"></div>
+                                <input type="text" class="tag-input" id="mf-skill_tags-input" placeholder="Java, AWS, PM 等を入力...">
+                            </div>
+                            <input type="hidden" id="mf-skill_tags">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>業界タグ <span class="tag-hint">Enterで追加 / クリックで削除</span></label>
+                            <div class="tag-input-wrap" id="mf-industry_tags-wrap">
+                                <div class="tag-list" id="mf-industry_tags-tags"></div>
+                                <input type="text" class="tag-input" id="mf-industry_tags-input" placeholder="金融, 官公庁, EC 等を入力...">
+                            </div>
+                            <input type="hidden" id="mf-industry_tags">
+                        </div>
+                        <div class="form-group full-width">
+                            <label>スキル一覧（概要メモ）</label>
+                            <textarea id="mf-skills_summary" rows="2"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>経験一覧（概要）</label>
+                            <textarea id="mf-experience_summary" rows="3"></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label>営業コメント</label>
+                            <textarea id="mf-sales_comment" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-close="modal-member-form">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Matching Create Modal -->
+    <div class="modal-overlay" id="modal-matching-form">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>マッチング登録</h2>
+                <button class="modal-close" data-close="modal-matching-form"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="matching-form">
+                    <input type="hidden" id="mtf-id">
+                    <input type="hidden" id="mtf-project_id">
+                    <input type="hidden" id="mtf-member_id">
+                    <div class="form-group">
+                        <label>案件</label>
+                        <input type="text" id="mtf-project-label" readonly class="readonly-input">
+                    </div>
+                    <div class="form-group">
+                        <label>要員</label>
+                        <input type="text" id="mtf-member-label" readonly class="readonly-input">
+                    </div>
+                    <div class="form-group">
+                        <label>ステータス</label>
+                        <select id="mtf-status">
+                            <option value="候補">候補</option>
+                            <option value="提案中">提案中</option>
+                            <option value="面談調整中">面談調整中</option>
+                            <option value="面談済">面談済</option>
+                            <option value="内定">内定</option>
+                            <option value="参画決定">参画決定</option>
+                            <option value="見送り">見送り</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>提案日</label>
+                        <input type="text" id="mtf-proposed_date" placeholder="YYYY/MM/DD">
+                    </div>
+                    <div class="form-group">
+                        <label>面談日</label>
+                        <input type="text" id="mtf-interview_date" placeholder="YYYY/MM/DD">
+                    </div>
+                    <div class="form-group">
+                        <label>メモ</label>
+                        <textarea id="mtf-note" rows="3"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-close="modal-matching-form">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">登録</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="modal-import">
+        <div class="modal modal-xl">
+            <div class="modal-header">
+                <h2 id="import-modal-title">データインポート</h2>
+                <button class="modal-close" data-close="modal-import"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- Import Tabs -->
+                <div class="import-tabs">
+                    <button class="import-tab active" data-tab="excel"><i class="fas fa-file-excel"></i> Excel</button>
+                    <button class="import-tab" data-tab="csv"><i class="fas fa-file-csv"></i> CSV</button>
+                    <button class="import-tab" data-tab="json"><i class="fas fa-code"></i> JSON</button>
+                    <button class="import-tab" data-tab="text"><i class="fas fa-paste"></i> テキスト貼り付け</button>
+                </div>
+
+                <!-- Excel Tab -->
+                <div class="import-tab-content active" id="tab-excel">
+                    <div class="drop-zone" id="drop-zone-excel">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Excelファイルをドラッグ&ドロップ<br>または</p>
+                        <label class="btn btn-primary btn-file">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                            <input type="file" id="file-excel" accept=".xlsx,.xls" hidden>
+                        </label>
+                        <p class="drop-hint">.xlsx / .xls 対応</p>
+                    </div>
+                </div>
+
+                <!-- CSV Tab -->
+                <div class="import-tab-content" id="tab-csv">
+                    <div class="drop-zone" id="drop-zone-csv">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>CSVファイルをドラッグ&ドロップ<br>または</p>
+                        <label class="btn btn-primary btn-file">
+                            <i class="fas fa-folder-open"></i> ファイルを選択
+                            <input type="file" id="file-csv" accept=".csv,.tsv,.txt" hidden>
+                        </label>
+                        <p class="drop-hint">.csv / .tsv 対応（UTF-8推奨）</p>
+                    </div>
+                </div>
+
+                <!-- JSON Tab -->
+                <div class="import-tab-content" id="tab-json">
+                    <div class="import-text-area">
+                        <div class="json-header-row">
+                            <label>JSONデータを貼り付け（配列形式）</label>
+                            <button class="btn btn-sm btn-secondary" id="btn-json-template"><i class="fas fa-copy"></i> テンプレートをコピー</button>
+                        </div>
+                        <textarea id="json-input" rows="12" placeholder='[\n  {"status": "Open", "project_name_original": "案件名...", ...},\n  ...\n]'></textarea>
+                        <button class="btn btn-primary" id="btn-parse-json"><i class="fas fa-check"></i> JSONを解析</button>
+                    </div>
+                </div>
+
+                <!-- Text Tab -->
+                <div class="import-tab-content" id="tab-text">
+                    <div class="import-text-area">
+                        <label>テキストデータを貼り付け（タブ区切り / Excelからのコピペ）</label>
+                        <textarea id="text-input" rows="12" placeholder="Excelからコピーした内容をそのまま貼り付けてください。&#10;1行目がヘッダー行として扱われます。"></textarea>
+                        <div class="text-options">
+                            <label><input type="checkbox" id="text-has-header" checked> 1行目をヘッダーとして使用</label>
+                            <select id="text-delimiter">
+                                <option value="tab">区切り文字: タブ（Excel標準）</option>
+                                <option value="comma">区切り文字: カンマ</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-parse-text"><i class="fas fa-check"></i> テキストを解析</button>
+                    </div>
+                </div>
+
+                <!-- Preview & Mapping -->
+                <div id="import-preview-section" style="display:none;">
+                    <div class="import-mapping-header">
+                        <h3><i class="fas fa-columns"></i> カラムマッピング</h3>
+                        <p class="import-count">検出データ: <strong id="import-row-count">0</strong>行</p>
+                    </div>
+                    <div class="mapping-grid" id="mapping-grid"></div>
+
+                    <div class="import-preview-header">
+                        <h3><i class="fas fa-eye"></i> プレビュー（先頭5件）</h3>
+                    </div>
+                    <div class="import-preview-table-wrap">
+                        <table class="data-table" id="import-preview-table">
+                            <thead id="import-preview-thead"></thead>
+                            <tbody id="import-preview-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="import-actions">
+                        <span class="import-mode-label">モード:</span>
+                        <select id="import-mode">
+                            <option value="append">追加（既存データに追加）</option>
+                            <option value="replace">置換（既存データを全削除して入れ替え）</option>
+                        </select>
+                        <button class="btn btn-secondary" id="btn-import-reset"><i class="fas fa-undo"></i> やり直し</button>
+                        <button class="btn btn-primary" id="btn-import-execute"><i class="fas fa-database"></i> インポート実行</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/import.js"></script>
+</body>
+</html>
+
+
+【CSS】
+:root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --primary-light: #e0e7ff;
+    --sidebar-bg: #1e1b4b;
+    --sidebar-hover: #312e81;
+    --bg: #f1f5f9;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+    --radius: 10px;
+    --sidebar-width: 250px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Noto Sans JP', 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100;
+    transition: transform 0.3s ease;
+}
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+}
+.logo i { color: #fbbf24; font-size: 24px; }
+.sidebar-nav {
+    flex: 1;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+.nav-item.active { background: var(--primary); color: #fff; }
+.nav-item i { width: 20px; text-align: center; }
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+.user-info { display: flex; align-items: center; gap: 12px; }
+.user-avatar {
+    width: 36px; height: 36px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+.user-detail { display: flex; flex-direction: column; }
+.user-name { font-size: 14px; font-weight: 600; }
+.user-role { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+/* Main */
+.main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+/* Header */
+.header {
+    background: var(--card-bg);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--text);
+    cursor: pointer;
+}
+.page-title { font-size: 20px; font-weight: 700; flex: 1; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.current-date { font-size: 13px; color: var(--text-secondary); }
+
+/* Pages */
+.page { display: none; padding: 24px 28px; }
+.page.active { display: block; }
+
+/* Stats */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.stat-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow);
+}
+.stat-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+.stat-icon.blue { background: #dbeafe; color: #2563eb; }
+.stat-icon.green { background: #d1fae5; color: #059669; }
+.stat-icon.orange { background: #fef3c7; color: #d97706; }
+.stat-icon.purple { background: #ede9fe; color: #7c3aed; }
+.stat-value { font-size: 28px; font-weight: 700; display: block; }
+.stat-label { font-size: 13px; color: var(--text-secondary); }
+
+/* Dashboard Grid */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Cards */
+.card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.card-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.card-header h3 i { color: var(--primary); font-size: 14px; }
+.card-body { padding: 16px 20px; }
+
+/* Recent List */
+.recent-list { display: flex; flex-direction: column; gap: 12px; }
+.recent-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-item:hover { background: #f8fafc; margin: 0 -20px; padding: 10px 20px; }
+.recent-item-name { font-size: 13px; font-weight: 500; flex: 1; margin-right: 12px; }
+.recent-item-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+
+/* Page Actions */
+.page-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 250px;
+}
+.search-box i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.search-box input {
+    width: 100%;
+    padding: 10px 14px 10px 40px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--card-bg);
+    outline: none;
+    transition: border-color 0.2s;
+}
+.search-box input:focus { border-color: var(--primary); }
+.filter-group { display: flex; gap: 8px; }
+.filter-group select,
+.full-select {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--card-bg);
+    outline: none;
+    cursor: pointer;
+}
+.full-select { width: 100%; margin-bottom: 12px; }
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-sm { padding: 6px 10px; font-size: 12px; }
+.btn-danger { background: #fef2f2; color: var(--danger); }
+.btn-danger:hover { background: #fee2e2; }
+.btn-match {
+    background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+    color: #fff;
+    padding: 16px 28px;
+    font-size: 15px;
+    border-radius: 12px;
+    flex-direction: column;
+    gap: 4px;
+}
+.btn-match:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-match:not(:disabled):hover { transform: scale(1.05); }
+
+/* Table */
+.table-container {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+}
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border);
+    background: #f8fafc;
+    white-space: nowrap;
+}
+.data-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+.data-table tbody tr { transition: background 0.15s; }
+.data-table tbody tr:hover { background: #f8fafc; }
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.badge-open { background: #d1fae5; color: #065f46; }
+.badge-closed { background: #fee2e2; color: #991b1b; }
+.badge-hold { background: #fef3c7; color: #92400e; }
+.badge-ok { background: #dbeafe; color: #1e40af; }
+.badge-ng { background: #fce7f3; color: #9d174d; }
+.badge-candidate { background: #f3e8ff; color: #6b21a8; }
+.badge-proposed { background: #dbeafe; color: #1e40af; }
+.badge-interviewing { background: #fef3c7; color: #92400e; }
+.badge-interviewed { background: #fce7f3; color: #9d174d; }
+.badge-offered { background: #d1fae5; color: #065f46; }
+.badge-decided { background: #065f46; color: #fff; }
+.badge-rejected { background: #fee2e2; color: #991b1b; }
+.badge-searching { background: #fef3c7; color: #92400e; }
+.badge-active { background: #d1fae5; color: #065f46; }
+
+/* Members Grid */
+.members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+}
+.member-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+.member-card:hover { border-color: var(--primary); box-shadow: var(--shadow-lg); }
+.member-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.member-name { font-size: 16px; font-weight: 700; }
+.member-initial { font-size: 13px; color: var(--text-secondary); }
+.member-meta { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.member-meta-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.member-meta-item i { width: 16px; text-align: center; color: var(--primary); font-size: 12px; }
+.member-skills { display: flex; flex-wrap: wrap; gap: 4px; }
+.member-matching-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.skill-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.member-card-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* Matching Layout */
+.matching-layout {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 24px;
+}
+.matching-panel {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    min-height: 400px;
+}
+.panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.panel-header h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.panel-header h3 i { color: var(--primary); }
+.panel-body { padding: 16px 20px; }
+.matching-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 120px;
+}
+.matching-results { display: flex; flex-direction: column; gap: 12px; }
+.match-candidate {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+.match-candidate:hover { border-color: var(--primary); background: var(--primary-light); }
+.match-candidate-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.match-candidate-name { font-weight: 600; font-size: 14px; }
+.match-candidate-price { font-size: 13px; color: var(--text-secondary); }
+.match-candidate-skills { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.match-candidate-actions { display: flex; gap: 6px; }
+
+/* Detail Box */
+.detail-box { font-size: 13px; }
+.detail-box .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.detail-box .detail-label { font-weight: 600; width: 100px; flex-shrink: 0; color: var(--text-secondary); font-size: 12px; }
+.detail-box .detail-value { flex: 1; word-break: break-all; }
+
+/* Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+    background: var(--card-bg);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+}
+.modal-lg { max-width: 800px; }
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 10;
+    border-radius: 16px 16px 0 0;
+}
+.modal-header h2 { font-size: 18px; font-weight: 700; }
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 24px; }
+
+/* Form */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full-width { grid-column: 1 / -1; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus { border-color: var(--primary); }
+.readonly-input { background: #f8fafc; }
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+/* Detail Modal */
+.detail-section { margin-bottom: 20px; }
+.detail-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--primary-light);
+}
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.detail-item { font-size: 13px; }
+.detail-item-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.detail-item-value { margin-top: 2px; }
+.detail-item.full-width { grid-column: 1 / -1; }
+.detail-item-value.long-text { white-space: pre-wrap; line-height: 1.6; }
+
+.mt-20 { margin-top: 20px; }
+
+/* Toast */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1e293b;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 300;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.3s ease;
+}
+@keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Import Modal */
+.modal-xl { max-width: 960px; }
+
+.import-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+.import-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+.import-tab:hover { color: var(--primary); }
+.import-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.import-tab-content { display: none; }
+.import-tab-content.active { display: block; }
+
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.drop-zone:hover,
+.drop-zone-active { border-color: var(--primary); background: var(--primary-light); }
+.drop-zone i.fa-cloud-upload-alt { font-size: 48px; color: var(--primary); opacity: 0.5; margin-bottom: 12px; }
+.drop-zone p { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.6; }
+.drop-hint { font-size: 12px; color: var(--text-secondary); opacity: 0.7; margin-top: 8px !important; }
+.btn-file { cursor: pointer; }
+.drop-zone-loaded { border-color: var(--success); background: #d1fae5; }
+.drop-zone-loaded i.fa-cloud-upload-alt { color: var(--success); }
+.drop-zone-filename {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--success);
+    margin-top: 8px;
+}
+.drop-zone-filename i { margin-right: 4px; }
+
+/* Import Text Area */
+.import-text-area { display: flex; flex-direction: column; gap: 10px; }
+.import-text-area label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.json-header-row { display: flex; justify-content: space-between; align-items: center; }
+.import-text-area textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: 'Noto Sans JP', monospace;
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+.import-text-area textarea:focus { border-color: var(--primary); }
+.text-options {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+}
+.text-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal; color: var(--text); }
+.text-options select {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+}
+
+/* Mapping */
+.import-mapping-header,
+.import-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-light);
+}
+.import-mapping-header h3,
+.import-preview-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.import-mapping-header h3 i,
+.import-preview-header h3 i { color: var(--primary); }
+.import-count { font-size: 13px; color: var(--text-secondary); }
+
+.mapping-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 4px;
+}
+.mapping-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+.mapping-source {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 0;
+    flex-shrink: 0;
+    max-width: 120px;
+}
+.mapping-source i { color: var(--text-secondary); font-size: 11px; }
+.mapping-source span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mapping-arrow { color: var(--text-secondary); font-size: 12px; flex-shrink: 0; }
+.mapping-select {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    outline: none;
+    min-width: 0;
+}
+
+/* Import Preview Table */
+.import-preview-table-wrap {
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+/* Import Actions */
+.import-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+.import-mode-label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.import-actions select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+}
+.import-actions .btn { margin-left: auto; }
+.import-actions .btn:last-child { margin-left: 0; }
+#btn-import-reset { margin-left: auto; }
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+.empty-state i { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+.empty-state p { font-size: 14px; }
+
+/* Tag Input */
+.tag-input-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    cursor: text;
+    min-height: 38px;
+    align-items: center;
+    transition: border-color 0.2s;
+}
+.tag-input-wrap:focus-within { border-color: var(--primary); }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: default;
+}
+.tag-item .tag-remove {
+    cursor: pointer;
+    font-size: 10px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+    padding: 0 2px;
+}
+.tag-item .tag-remove:hover { opacity: 1; color: var(--danger); }
+.tag-input {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    font-family: inherit;
+    flex: 1;
+    min-width: 100px;
+    padding: 2px 4px;
+    background: transparent;
+}
+.tag-hint {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* Bulk Action Bar */
+.bulk-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--primary-light);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    animation: slideIn 0.2s ease;
+}
+.bulk-count { font-size: 13px; font-weight: 600; color: var(--primary); }
+.bulk-action-bar select {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+}
+.th-check { width: 40px; text-align: center; }
+.th-check input { cursor: pointer; }
+
+/* Sortable Headers */
+.sortable { cursor: pointer; user-select: none; position: relative; }
+.sortable:hover { color: var(--primary); }
+.sortable i { font-size: 10px; opacity: 0.4; margin-left: 2px; }
+.sortable.sort-asc i, .sortable.sort-desc i { opacity: 1; color: var(--primary); }
+
+/* Inline Status Select */
+.inline-status-select {
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.2s;
+}
+.inline-status-select:focus { border-color: var(--primary); }
+
+/* Matching Legend */
+.matching-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+}
+.legend-item { font-size: 11px; }
+
+/* Notes */
+.notes-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.note-item {
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+.note-content { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.note-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.note-form { margin-top: 8px; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .matching-layout { grid-template-columns: 1fr; }
+    .matching-center { padding-top: 0; padding-bottom: 0; }
+}
+
+@media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main-content { margin-left: 0; }
+    .menu-toggle { display: block; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .page { padding: 16px; }
+    .header { padding: 12px 16px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .members-grid { grid-template-columns: 1fr; }
+    .page-actions { flex-direction: column; }
+    .search-box { min-width: 100%; }
+    .filter-group { width: 100%; }
+    .filter-group select { flex: 1; }
+}
+
+
+【JavaScript】
+// ============================================
+// SES案件マッチング管理ツール - Main Application
+// ============================================
+
+const API_BASE = 'tables';
+let projectsCache = [];
+let membersCache = [];
+let matchingsCache = [];
+let projectSort = { field: 'added_date', dir: 'desc' };
+let selectedProjectIds = new Set();
+
+// ---- API Functions ----
+async function fetchTable(table, limit = 500) {
+    const res = await fetch(`${API_BASE}/${table}?limit=${limit}&sort=-created_at`);
+    const data = await res.json();
+    return data.data || [];
+}
+
+async function createRecord(table, record) {
+    const res = await fetch(`${API_BASE}/${table}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+    });
+    return await res.json();
+}
+
+async function updateRecord(table, id, record) {
+    const res = await fetch(`${API_BASE}/${table}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+    });
+    return await res.json();
+}
+
+async function deleteRecord(table, id) {
+    await fetch(`${API_BASE}/${table}/${id}`, { method: 'DELETE' });
+}
+
+// ---- Tag Input Component ----
+function initTagInput(hiddenId) {
+    const wrap = document.getElementById(hiddenId + '-wrap');
+    const tagsEl = document.getElementById(hiddenId + '-tags');
+    const input = document.getElementById(hiddenId + '-input');
+    const hidden = document.getElementById(hiddenId);
+    if (!wrap || !input || !hidden) return;
+
+    function getTags() {
+        return hidden.value ? hidden.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+    }
+    function setTags(tags) {
+        hidden.value = tags.join(',');
+        renderTags();
+    }
+    function renderTags() {
+        const tags = getTags();
+        tagsEl.innerHTML = tags.map((t, i) =>
+            `<span class="tag-item">${escHtml(t)}<span class="tag-remove" data-idx="${i}"><i class="fas fa-times"></i></span></span>`
+        ).join('');
+        tagsEl.querySelectorAll('.tag-remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const tags = getTags();
+                tags.splice(parseInt(btn.dataset.idx), 1);
+                setTags(tags);
+            });
+        });
+    }
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const val = input.value.trim().replace(/,/g, '');
+            if (val && !getTags().includes(val)) {
+                setTags([...getTags(), val]);
+            }
+            input.value = '';
+        }
+        if (e.key === 'Backspace' && !input.value) {
+            const tags = getTags();
+            if (tags.length) { tags.pop(); setTags(tags); }
+        }
+    });
+    // カンマ区切りペースト対応
+    input.addEventListener('paste', (e) => {
+        setTimeout(() => {
+            const parts = input.value.split(/[,、\/]+/).map(s => s.trim()).filter(Boolean);
+            if (parts.length > 1) {
+                const existing = getTags();
+                const merged = [...existing, ...parts.filter(p => !existing.includes(p))];
+                setTags(merged);
+                input.value = '';
+            }
+        }, 0);
+    });
+    wrap.addEventListener('click', () => input.focus());
+    renderTags();
+    return { getTags, setTags, renderTags };
+}
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', async () => {
+    initNav();
+    initModals();
+    initForms();
+    initTagInputs();
+    initBulkActions();
+    initSort();
+    initExport();
+    setCurrentDate();
+    await loadAllData();
+    renderDashboard();
+    renderProjects();
+    renderMembers();
+    renderMatchings();
+    renderMatchingPage();
+    initFilters();
+});
+
+function initTagInputs() {
+    initTagInput('pf-required_skill_tags');
+    initTagInput('pf-preferred_skill_tags');
+    initTagInput('mf-skill_tags');
+}
+
+function setCurrentDate() {
+    const d = new Date();
+    document.getElementById('currentDate').textContent =
+        `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function loadAllData() {
+    try {
+        [projectsCache, membersCache, matchingsCache] = await Promise.all([
+            fetchTable('projects'),
+            fetchTable('members'),
+            fetchTable('matchings')
+        ]);
+        await loadActivityLogs();
+    } catch (e) {
+        console.error('Data load error:', e);
+    }
+}
+
+// ---- Navigation ----
+function initNav() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const page = item.dataset.page;
+            navigateTo(page);
+        });
+    });
+
+    document.getElementById('menuToggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+    });
+}
+
+function navigateTo(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(`page-${page}`).classList.add('active');
+
+    const titles = { dashboard: 'ダッシュボード', projects: '案件管理', members: '要員管理', matching: 'マッチング' };
+    document.getElementById('pageTitle').textContent = titles[page] || '';
+
+    document.getElementById('sidebar').classList.remove('open');
+}
+
+// ---- Modals ----
+function initModals() {
+    document.querySelectorAll('[data-close]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeModal(btn.dataset.close);
+        });
+    });
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModal(overlay.id);
+        });
+    });
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('show');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+// ---- Toast ----
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+}
+
+// ---- Dashboard ----
+function renderDashboard() {
+    const openProjects = projectsCache.filter(p => p.status === 'Open');
+    document.getElementById('stat-projects').textContent = openProjects.length;
+    document.getElementById('stat-members').textContent = membersCache.length;
+    document.getElementById('stat-matchings').textContent = matchingsCache.length;
+    document.getElementById('stat-shareable').textContent = openProjects.filter(p => p.shareable === 'OK').length;
+
+    // Recent projects
+    const recentEl = document.getElementById('recent-projects');
+    const sorted = [...projectsCache].sort((a, b) => (b.added_date || '').localeCompare(a.added_date || '')).slice(0, 8);
+    if (sorted.length === 0) {
+        recentEl.innerHTML = '<div class="empty-state"><i class="fas fa-inbox"></i><p>案件データなし</p></div>';
+    } else {
+        recentEl.innerHTML = sorted.map(p => `
+            <div class="recent-item" onclick="showProjectDetail('${p.id}')">
+                <span class="recent-item-name">${escHtml(p.project_name_rewrite || p.project_name_original || '-')}</span>
+                <span class="recent-item-meta">${escHtml(p.added_date || '-')}</span>
+            </div>
+        `).join('');
+    }
+
+    // Searching members
+    const searchingEl = document.getElementById('searching-members');
+    const searching = membersCache.filter(m => m.process === '案件検索中');
+    if (searching.length === 0) {
+        searchingEl.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i><p>検索中の要員なし</p></div>';
+    } else {
+        searchingEl.innerHTML = searching.map(m => `
+            <div class="recent-item" onclick="showMemberDetail('${m.id}')">
+                <span class="recent-item-name">${escHtml(m.full_name || m.initial)} - ${escHtml(m.desired_position || '-')}</span>
+                <span class="recent-item-meta">${escHtml(m.desired_price || '-')}</span>
+            </div>
+        `).join('');
+    }
+
+    // Activity log
+    renderActivityLog();
+
+    // Charts
+    renderDashboardCharts();
+}
+
+let chartProjectStatus = null;
+let chartMatchingStatus = null;
+
+function renderDashboardCharts() {
+    // 案件ステータス分布（棒グラフ）
+    const statusCounts = { Open: 0, Closed: 0, Hold: 0 };
+    projectsCache.forEach(p => {
+        if (statusCounts.hasOwnProperty(p.status)) statusCounts[p.status]++;
+        else statusCounts[p.status || 'Open']++;
+    });
+
+    const ctx1 = document.getElementById('chart-project-status');
+    if (chartProjectStatus) chartProjectStatus.destroy();
+    chartProjectStatus = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(statusCounts),
+            datasets: [{
+                label: '件数',
+                data: Object.values(statusCounts),
+                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                borderRadius: 6,
+                maxBarThickness: 60,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+
+    // マッチングステータス分布（ドーナツ）
+    const matchStatusCounts = {};
+    matchingsCache.forEach(mt => {
+        matchStatusCounts[mt.status] = (matchStatusCounts[mt.status] || 0) + 1;
+    });
+    const matchLabels = Object.keys(matchStatusCounts);
+    const matchValues = Object.values(matchStatusCounts);
+    const matchColors = ['#8b5cf6','#3b82f6','#f59e0b','#ec4899','#10b981','#065f46','#ef4444'];
+
+    const ctx2 = document.getElementById('chart-matching-status');
+    if (chartMatchingStatus) chartMatchingStatus.destroy();
+    chartMatchingStatus = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: matchLabels,
+            datasets: [{
+                data: matchValues,
+                backgroundColor: matchColors.slice(0, matchLabels.length),
+                borderWidth: 2,
+                borderColor: '#fff',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { font: { size: 12 } } }
+            }
+        }
+    });
+}
+
+// ---- Projects ----
+function renderProjects(filter = {}) {
+    const tbody = document.getElementById('projects-tbody');
+    let list = [...projectsCache];
+
+    if (filter.search) {
+        const q = filter.search.toLowerCase();
+        list = list.filter(p =>
+            (p.project_name_rewrite || '').toLowerCase().includes(q) ||
+            (p.project_name_original || '').toLowerCase().includes(q) ||
+            (p.required_skills || '').toLowerCase().includes(q) ||
+            (p.location || '').toLowerCase().includes(q) ||
+            (p.role || '').toLowerCase().includes(q)
+        );
+    }
+    if (filter.shareable) list = list.filter(p => p.shareable === filter.shareable);
+    if (filter.workstyle) list = list.filter(p => (p.work_style || '').includes(filter.workstyle));
+
+    // ソート
+    list = sortProjects(list);
+
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="empty-state"><i class="fas fa-inbox"></i><p>該当する案件がありません</p></td></tr>';
+        updateBulkBar();
+        return;
+    }
+
+    tbody.innerHTML = list.map(p => {
+        const matchCount = matchingsCache.filter(mt => mt.project_id === p.id).length;
+        const checked = selectedProjectIds.has(p.id) ? 'checked' : '';
+        return `
+        <tr>
+            <td class="th-check"><input type="checkbox" class="project-check" data-id="${p.id}" ${checked}></td>
+            <td><span class="badge badge-${p.status?.toLowerCase() || 'open'}">${escHtml(p.status)}</span></td>
+            <td><span class="badge badge-${p.shareable?.toLowerCase() || 'ok'}">${escHtml(p.shareable)}</span></td>
+            <td>${escHtml(p.added_date || '-')}</td>
+            <td><a href="#" onclick="showProjectDetail('${p.id}'); return false;" style="color:var(--primary);font-weight:500;">${escHtml(truncate(p.project_name_rewrite || p.project_name_original, 30))}</a></td>
+            <td>${escHtml(truncate(p.role, 20))}</td>
+            <td>${escHtml(p.location || '-')}</td>
+            <td>${escHtml(p.work_style || '-')}</td>
+            <td>${escHtml(p.purchase_price || '-')}</td>
+            <td>${escHtml(truncate(p.source, 15))}</td>
+            <td>${matchCount > 0 ? `<span class="badge badge-proposed">${matchCount}件</span>` : '<span style="color:var(--text-secondary);font-size:12px;">-</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="editProject('${p.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-sm btn-danger" onclick="deleteProject('${p.id}')"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `}).join('');
+
+    // チェックボックスイベント
+    tbody.querySelectorAll('.project-check').forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (cb.checked) selectedProjectIds.add(cb.dataset.id);
+            else selectedProjectIds.delete(cb.dataset.id);
+            updateBulkBar();
+        });
+    });
+    updateBulkBar();
+}
+
+function sortProjects(list) {
+    const { field, dir } = projectSort;
+    const mult = dir === 'asc' ? 1 : -1;
+    return list.sort((a, b) => {
+        let va, vb;
+        if (field === 'match_count') {
+            va = matchingsCache.filter(mt => mt.project_id === a.id).length;
+            vb = matchingsCache.filter(mt => mt.project_id === b.id).length;
+            return (va - vb) * mult;
+        } else if (field === 'purchase_price_num') {
+            va = parseFloat(a.purchase_price_num) || 0;
+            vb = parseFloat(b.purchase_price_num) || 0;
+            return (va - vb) * mult;
+        } else if (field === 'project_name') {
+            va = (a.project_name_rewrite || a.project_name_original || '').toLowerCase();
+            vb = (b.project_name_rewrite || b.project_name_original || '').toLowerCase();
+            return va.localeCompare(vb) * mult;
+        } else {
+            va = (a[field] || '');
+            vb = (b[field] || '');
+            return va.localeCompare(vb) * mult;
+        }
+    });
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('project-bulk-bar');
+    const count = selectedProjectIds.size;
+    document.getElementById('project-bulk-count').textContent = count;
+    bar.style.display = count > 0 ? 'flex' : 'none';
+    document.getElementById('project-check-all').checked =
+        count > 0 && count === document.querySelectorAll('.project-check').length;
+}
+
+function initBulkActions() {
+    // 全選択チェックボックス
+    document.getElementById('project-check-all').addEventListener('change', (e) => {
+        const checks = document.querySelectorAll('.project-check');
+        checks.forEach(cb => {
+            cb.checked = e.target.checked;
+            if (e.target.checked) selectedProjectIds.add(cb.dataset.id);
+            else selectedProjectIds.delete(cb.dataset.id);
+        });
+        updateBulkBar();
+    });
+
+    // 一括適用
+    document.getElementById('btn-project-bulk-apply').addEventListener('click', async () => {
+        if (selectedProjectIds.size === 0) return;
+        const newStatus = document.getElementById('project-bulk-status').value;
+        const newShareable = document.getElementById('project-bulk-shareable').value;
+        if (!newStatus && !newShareable) {
+            showToast('変更内容を選択してください');
+            return;
+        }
+        const btn = document.getElementById('btn-project-bulk-apply');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            const updates = {};
+            if (newStatus) updates.status = newStatus;
+            if (newShareable) updates.shareable = newShareable;
+            for (const id of selectedProjectIds) {
+                await fetch(`${API_BASE}/projects/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+            }
+            showToast(`${selectedProjectIds.size}件を更新しました`);
+            logActivity('一括更新', 'projects', '', `${selectedProjectIds.size}件`, `${newStatus ? 'ステータス→'+newStatus : ''} ${newShareable ? '共有→'+newShareable : ''}`.trim());
+            selectedProjectIds.clear();
+            document.getElementById('project-bulk-status').value = '';
+            document.getElementById('project-bulk-shareable').value = '';
+            await loadAllData();
+            renderProjects(getProjectFilters());
+            renderDashboard();
+            renderMatchingPage();
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> 適用';
+        }
+    });
+
+    // 選択解除
+    document.getElementById('btn-project-bulk-cancel').addEventListener('click', () => {
+        selectedProjectIds.clear();
+        document.querySelectorAll('.project-check').forEach(cb => cb.checked = false);
+        document.getElementById('project-check-all').checked = false;
+        updateBulkBar();
+    });
+}
+
+function initSort() {
+    document.querySelectorAll('#projects-table .sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.sort;
+            if (projectSort.field === field) {
+                projectSort.dir = projectSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                projectSort.field = field;
+                projectSort.dir = 'asc';
+            }
+            // UI更新
+            document.querySelectorAll('#projects-table .sortable').forEach(h => {
+                h.classList.remove('sort-asc', 'sort-desc');
+                h.querySelector('i').className = 'fas fa-sort';
+            });
+            th.classList.add(projectSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+            th.querySelector('i').className = projectSort.dir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            renderProjects(getProjectFilters());
+        });
+    });
+}
+
+function showProjectDetail(id) {
+    const p = projectsCache.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('modal-project-title').textContent = p.project_name_rewrite || p.project_name_original || '案件詳細';
+    document.getElementById('modal-project-body').innerHTML = `
+        <div class="detail-section">
+            <h4>基本情報</h4>
+            <div class="detail-grid">
+                <div class="detail-item"><div class="detail-item-label">ステータス</div><div class="detail-item-value"><span class="badge badge-${p.status?.toLowerCase()}">${escHtml(p.status)}</span></div></div>
+                <div class="detail-item"><div class="detail-item-label">共有可否</div><div class="detail-item-value"><span class="badge badge-${p.shareable?.toLowerCase()}">${escHtml(p.shareable)}</span> ${p.share_note ? `（${escHtml(p.share_note)}）` : ''}</div></div>
+                <div class="detail-item"><div class="detail-item-label">追加日</div><div class="detail-item-value">${escHtml(p.added_date || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">案件元</div><div class="detail-item-value">${escHtml(p.source || '-')}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">案件名（原文）</div><div class="detail-item-value">${escHtml(p.project_name_original || '-')}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">案件名（リライト）</div><div class="detail-item-value">${escHtml(p.project_name_rewrite || '-')}</div></div>
+            </div>
+        </div>
+        <div class="detail-section">
+            <h4>条件面</h4>
+            <div class="detail-grid">
+                <div class="detail-item"><div class="detail-item-label">募集職種</div><div class="detail-item-value">${escHtml(p.role || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">元単価</div><div class="detail-item-value">${escHtml(p.client_price || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">仕入単価</div><div class="detail-item-value">${escHtml(p.purchase_price || '-')}${p.purchase_price_num ? ` (${p.purchase_price_num}万円)` : ''}</div></div>
+                <div class="detail-item"><div class="detail-item-label">必要経験</div><div class="detail-item-value">${p.required_experience_years ? p.required_experience_years + '年以上' : '-'}</div></div>
+                <div class="detail-item"><div class="detail-item-label">勤務地</div><div class="detail-item-value">${escHtml(p.location || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">働き方</div><div class="detail-item-value">${escHtml(p.work_style || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">期間</div><div class="detail-item-value">${escHtml(p.period || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">募集人数</div><div class="detail-item-value">${escHtml(p.headcount || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">年齢制限</div><div class="detail-item-value">${escHtml(p.age_limit || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">外国籍</div><div class="detail-item-value">${escHtml(p.nationality || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">英語</div><div class="detail-item-value">${escHtml(p.english || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">商流</div><div class="detail-item-value">${escHtml(p.commercial_flow || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">面談</div><div class="detail-item-value">${escHtml(p.interview_count || '-')}</div></div>
+            </div>
+        </div>
+        <div class="detail-section">
+            <h4>スキル要件</h4>
+            <div class="detail-grid">
+                <div class="detail-item full-width"><div class="detail-item-label">必須スキルタグ</div><div class="detail-item-value">${p.required_skill_tags ? p.required_skill_tags.split(',').map(t => `<span class="skill-tag" style="background:#d1fae5;color:#065f46;">${escHtml(t.trim())}</span>`).join(' ') : '-'}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">尚可スキルタグ</div><div class="detail-item-value">${p.preferred_skill_tags ? p.preferred_skill_tags.split(',').map(t => `<span class="skill-tag" style="background:#dbeafe;color:#1e40af;">${escHtml(t.trim())}</span>`).join(' ') : '-'}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">業界タグ</div><div class="detail-item-value">${p.industry_tags ? p.industry_tags.split(',').map(t => `<span class="skill-tag" style="background:#fef3c7;color:#92400e;">${escHtml(t.trim())}</span>`).join(' ') : '-'}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">必須スキル（原文）</div><div class="detail-item-value long-text">${escHtml(p.required_skills || '-')}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">尚可スキル（原文）</div><div class="detail-item-value long-text">${escHtml(p.preferred_skills || '-')}</div></div>
+            </div>
+        </div>
+        ${renderProjectMatchings(id)}
+        ${renderNotesSection('projects', id)}
+    `;
+    openModal('modal-project-detail');
+}
+
+function renderProjectMatchings(projectId) {
+    const related = matchingsCache.filter(mt => mt.project_id === projectId);
+    if (related.length === 0) {
+        return `<div class="detail-section"><h4><i class="fas fa-users" style="color:var(--primary);margin-right:4px;font-size:13px;"></i>提案中の要員</h4><p style="font-size:13px;color:var(--text-secondary);">紐付いた要員はありません</p></div>`;
+    }
+    const rows = related.map(mt => {
+        const m = membersCache.find(x => x.id === mt.member_id);
+        const badge = getMatchingBadge(mt.status);
+        return `<tr>
+            <td>${escHtml(m ? (m.full_name || m.initial) : '-')}</td>
+            <td><span class="badge ${badge.cls}">${escHtml(mt.status)}</span></td>
+            <td>${escHtml(mt.proposed_date || '-')}</td>
+            <td>${escHtml(mt.interview_date || '-')}</td>
+            <td>${escHtml(truncate(mt.note, 30))}</td>
+        </tr>`;
+    }).join('');
+    return `<div class="detail-section"><h4><i class="fas fa-users" style="color:var(--primary);margin-right:4px;font-size:13px;"></i>提案中の要員（${related.length}件）</h4>
+        <table class="data-table"><thead><tr><th>要員名</th><th>ステータス</th><th>提案日</th><th>面談日</th><th>メモ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function editProject(id) {
+    const p = projectsCache.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('project-form-title').textContent = '案件編集';
+    const fields = ['id','status','shareable','share_note','added_date','source','project_name_original','project_name_rewrite',
+        'client_price','purchase_price','purchase_price_num','role','location','work_style','period','headcount','required_skills','preferred_skills',
+        'required_skill_tags','preferred_skill_tags','industry_tags','required_experience_years',
+        'age_limit','nationality','english','commercial_flow','interview_count'];
+    fields.forEach(f => {
+        const el = document.getElementById('pf-' + f);
+        if (el) el.value = p[f] || '';
+    });
+    // タグUIを再描画
+    initTagInput('pf-required_skill_tags');
+    initTagInput('pf-preferred_skill_tags');
+    initTagInput('pf-industry_tags');
+    openModal('modal-project-form');
+}
+
+async function deleteProject(id) {
+    if (!confirm('この案件を削除しますか？')) return;
+    await deleteRecord('projects', id);
+    await loadAllData();
+    renderProjects(getProjectFilters());
+    renderDashboard();
+    renderMatchingPage();
+    showToast('案件を削除しました');
+}
+
+// ---- Members ----
+function renderMembers(search = '') {
+    const grid = document.getElementById('members-grid');
+    let list = [...membersCache];
+
+    if (search) {
+        const q = search.toLowerCase();
+        list = list.filter(m =>
+            (m.full_name || '').toLowerCase().includes(q) ||
+            (m.initial || '').toLowerCase().includes(q) ||
+            (m.skills_summary || '').toLowerCase().includes(q) ||
+            (m.desired_position || '').toLowerCase().includes(q)
+        );
+    }
+
+    if (list.length === 0) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><i class="fas fa-users-slash"></i><p>該当する要員がいません</p></div>';
+        return;
+    }
+
+    grid.innerHTML = list.map(m => {
+        const skills = m.skill_tags
+            ? m.skill_tags.split(',').map(s => s.trim()).filter(Boolean).slice(0, 8)
+            : (m.skills_summary || '').split(/[,、\/]/).slice(0, 6).map(s => s.trim()).filter(Boolean);
+        const processBadge = getProcessBadge(m.process);
+        const relatedMatchings = matchingsCache.filter(mt => mt.member_id === m.id);
+        const activeMatchings = relatedMatchings.filter(mt => mt.status !== '見送り');
+        const matchingInfo = activeMatchings.map(mt => {
+            const p = projectsCache.find(x => x.id === mt.project_id);
+            return { name: p ? truncate(p.project_name_rewrite || p.project_name_original, 20) : '不明', status: mt.status };
+        });
+        return `
+            <div class="member-card" onclick="showMemberDetail('${m.id}')">
+                <div class="member-card-header">
+                    <div>
+                        <div class="member-name">${escHtml(m.full_name || m.initial)}</div>
+                        <div class="member-initial">${escHtml(m.initial)} | ${escHtml(m.affiliation || '-')}</div>
+                    </div>
+                    <span class="badge ${processBadge.cls}">${escHtml(m.process)}</span>
+                </div>
+                <div class="member-meta">
+                    <div class="member-meta-item"><i class="fas fa-yen-sign"></i>${escHtml(m.desired_price || '-')}</div>
+                    <div class="member-meta-item"><i class="fas fa-map-marker-alt"></i>${escHtml(m.nearest_station || '-')}</div>
+                    <div class="member-meta-item"><i class="fas fa-calendar"></i>${escHtml(m.available_date || '-')}</div>
+                    <div class="member-meta-item"><i class="fas fa-user-tie"></i>${escHtml(m.desired_position || '-')}</div>
+                </div>
+                ${matchingInfo.length > 0 ? `<div class="member-matching-tags"><i class="fas fa-briefcase" style="font-size:11px;color:var(--primary);margin-right:4px;"></i>${matchingInfo.map(mi => `<span class="badge ${getMatchingBadge(mi.status).cls}" style="margin:1px 2px;font-size:10px;">${escHtml(mi.name)} (${escHtml(mi.status)})</span>`).join('')}</div>` : ''}
+                <div class="member-skills">
+                    ${skills.map(s => `<span class="skill-tag">${escHtml(s)}</span>`).join('')}
+                </div>
+                <div class="member-card-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); editMember('${m.id}')"><i class="fas fa-edit"></i> 編集</button>
+                    <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteMember('${m.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function showMemberDetail(id) {
+    const m = membersCache.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('modal-member-title').textContent = m.full_name || m.initial || '要員詳細';
+    document.getElementById('modal-member-body').innerHTML = `
+        <div class="detail-section">
+            <h4>基本情報</h4>
+            <div class="detail-grid">
+                <div class="detail-item"><div class="detail-item-label">プロセス</div><div class="detail-item-value"><span class="badge ${getProcessBadge(m.process).cls}">${escHtml(m.process)}</span></div></div>
+                <div class="detail-item"><div class="detail-item-label">所属先</div><div class="detail-item-value">${escHtml(m.affiliation || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">本名</div><div class="detail-item-value">${escHtml(m.full_name || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">イニシャル</div><div class="detail-item-value">${escHtml(m.initial || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">希望単価</div><div class="detail-item-value">${escHtml(m.desired_price || '-')}${m.desired_price_num ? ` (${m.desired_price_num}万円)` : ''}</div></div>
+                <div class="detail-item"><div class="detail-item-label">経験年数</div><div class="detail-item-value">${m.experience_years ? m.experience_years + '年' : '-'}</div></div>
+                <div class="detail-item"><div class="detail-item-label">希望ポジション</div><div class="detail-item-value">${escHtml(m.desired_position || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">最寄駅</div><div class="detail-item-value">${escHtml(m.nearest_station || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">稼働可能日</div><div class="detail-item-value">${escHtml(m.available_date || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">勤務形態</div><div class="detail-item-value">${escHtml(m.work_preference || '-')}</div></div>
+                <div class="detail-item"><div class="detail-item-label">契約社員化</div><div class="detail-item-value">${escHtml(m.contract_employee || '-')}</div></div>
+                ${m.skill_sheet_url ? `<div class="detail-item full-width"><div class="detail-item-label">スキルシート</div><div class="detail-item-value"><a href="${escHtml(m.skill_sheet_url)}" target="_blank" style="color:var(--primary)"><i class="fas fa-external-link-alt"></i> 開く</a></div></div>` : ''}
+            </div>
+        </div>
+        <div class="detail-section">
+            <h4>スキル・経験</h4>
+            <div class="detail-grid">
+                <div class="detail-item full-width"><div class="detail-item-label">スキルタグ</div><div class="detail-item-value">${m.skill_tags ? m.skill_tags.split(',').map(t => `<span class="skill-tag">${escHtml(t.trim())}</span>`).join(' ') : '-'}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">業界タグ</div><div class="detail-item-value">${m.industry_tags ? m.industry_tags.split(',').map(t => `<span class="skill-tag" style="background:#fef3c7;color:#92400e;">${escHtml(t.trim())}</span>`).join(' ') : '-'}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">スキル一覧</div><div class="detail-item-value long-text">${escHtml(m.skills_summary || '-')}</div></div>
+                <div class="detail-item full-width"><div class="detail-item-label">経験一覧</div><div class="detail-item-value long-text">${escHtml(m.experience_summary || '-')}</div></div>
+            </div>
+        </div>
+        <div class="detail-section">
+            <h4>営業コメント</h4>
+            <div class="detail-item full-width"><div class="detail-item-value long-text">${escHtml(m.sales_comment || '-')}</div></div>
+        </div>
+        ${renderMemberMatchings(id)}
+        ${renderNotesSection('members', id)}
+    `;
+    openModal('modal-member-detail');
+}
+
+function renderMemberMatchings(memberId) {
+    const related = matchingsCache.filter(mt => mt.member_id === memberId);
+    if (related.length === 0) {
+        return `<div class="detail-section"><h4><i class="fas fa-briefcase" style="color:var(--primary);margin-right:4px;font-size:13px;"></i>提案中の案件</h4><p style="font-size:13px;color:var(--text-secondary);">紐付いた案件はありません</p></div>`;
+    }
+    const rows = related.map(mt => {
+        const p = projectsCache.find(x => x.id === mt.project_id);
+        const badge = getMatchingBadge(mt.status);
+        return `<tr>
+            <td>${escHtml(p ? truncate(p.project_name_rewrite || p.project_name_original, 30) : '-')}</td>
+            <td><span class="badge ${badge.cls}">${escHtml(mt.status)}</span></td>
+            <td>${escHtml(mt.proposed_date || '-')}</td>
+            <td>${escHtml(mt.interview_date || '-')}</td>
+            <td>${escHtml(truncate(mt.note, 30))}</td>
+        </tr>`;
+    }).join('');
+    return `<div class="detail-section"><h4><i class="fas fa-briefcase" style="color:var(--primary);margin-right:4px;font-size:13px;"></i>提案中の案件（${related.length}件）</h4>
+        <table class="data-table"><thead><tr><th>案件名</th><th>ステータス</th><th>提案日</th><th>面談日</th><th>メモ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function editMember(id) {
+    const m = membersCache.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('member-form-title').textContent = '要員編集';
+    const fields = ['id','process','affiliation','full_name','initial','contract_employee','desired_price','desired_price_num',
+        'contact','desired_position','nearest_station','available_date','work_preference',
+        'skill_sheet_url','skill_tags','industry_tags','experience_years','skills_summary','experience_summary','sales_comment'];
+    fields.forEach(f => {
+        const el = document.getElementById('mf-' + f);
+        if (el) el.value = m[f] || '';
+    });
+    // タグUIを再描画
+    initTagInput('mf-skill_tags');
+    initTagInput('mf-industry_tags');
+    openModal('modal-member-form');
+}
+
+async function deleteMember(id) {
+    if (!confirm('この要員を削除しますか？')) return;
+    await deleteRecord('members', id);
+    await loadAllData();
+    renderMembers(document.getElementById('member-search').value);
+    renderDashboard();
+    renderMatchingPage();
+    showToast('要員を削除しました');
+}
+
+// ---- Matching ----
+function renderMatchingPage() {
+    const sel = document.getElementById('matching-project-select');
+    const openProjects = projectsCache.filter(p => p.status === 'Open');
+    sel.innerHTML = '<option value="">-- 案件を選択 --</option>' +
+        openProjects.map(p => `<option value="${p.id}">${escHtml(truncate(p.project_name_rewrite || p.project_name_original, 50))}</option>`).join('');
+
+    sel.onchange = () => {
+        const pid = sel.value;
+        const btn = document.getElementById('btn-do-match');
+        if (!pid) {
+            document.getElementById('selected-project-detail').innerHTML = '';
+            document.getElementById('matching-results').innerHTML = '';
+            btn.disabled = true;
+            return;
+        }
+        btn.disabled = false;
+        const p = projectsCache.find(x => x.id === pid);
+        document.getElementById('selected-project-detail').innerHTML = `
+            <div class="detail-box">
+                <div class="detail-row"><span class="detail-label">職種</span><span class="detail-value">${escHtml(p.role || '-')}</span></div>
+                <div class="detail-row"><span class="detail-label">勤務地</span><span class="detail-value">${escHtml(p.location || '-')}</span></div>
+                <div class="detail-row"><span class="detail-label">働き方</span><span class="detail-value">${escHtml(p.work_style || '-')}</span></div>
+                <div class="detail-row"><span class="detail-label">仕入単価</span><span class="detail-value">${escHtml(p.purchase_price || '-')}</span></div>
+                <div class="detail-row"><span class="detail-label">必須タグ</span><span class="detail-value">${p.required_skill_tags ? p.required_skill_tags.split(',').map(t => `<span class="skill-tag" style="background:#d1fae5;color:#065f46;">${escHtml(t.trim())}</span>`).join(' ') : escHtml(truncate(p.required_skills, 80))}</span></div>
+                <div class="detail-row"><span class="detail-label">尚可タグ</span><span class="detail-value">${p.preferred_skill_tags ? p.preferred_skill_tags.split(',').map(t => `<span class="skill-tag" style="background:#dbeafe;color:#1e40af;">${escHtml(t.trim())}</span>`).join(' ') : escHtml(truncate(p.preferred_skills, 80))}</span></div>
+            </div>
+        `;
+    };
+
+    document.getElementById('btn-do-match').onclick = () => {
+        const pid = sel.value;
+        if (!pid) return;
+        doMatching(pid);
+    };
+}
+
+// ============================================
+// 類似スキルグループ定義
+// 同グループ内のスキルは「類似」としてマッチング時に考慮
+// ============================================
+const SKILL_GROUPS = [
+    // 言語系
+    ['java', 'kotlin', 'scala'],
+    ['javascript', 'typescript', 'node.js', 'nodejs'],
+    ['python', 'django', 'flask', 'fastapi'],
+    ['c#', '.net', 'asp.net', 'vb.net'],
+    ['c', 'c++'],
+    ['ruby', 'ruby on rails', 'rails'],
+    ['php', 'laravel', 'cakephp', 'symfony'],
+    ['go', 'golang'],
+    ['swift', 'objective-c', 'ios'],
+    ['dart', 'flutter'],
+    // フロントエンド
+    ['react', 'react.js', 'next.js', 'nextjs'],
+    ['vue', 'vue.js', 'nuxt.js', 'nuxtjs'],
+    ['angular', 'angularjs'],
+    ['html', 'css', 'html5', 'css3'],
+    // クラウド
+    ['aws', 'amazon web services'],
+    ['azure', 'microsoft azure'],
+    ['gcp', 'google cloud', 'google cloud platform'],
+    // DB
+    ['mysql', 'mariadb'],
+    ['postgresql', 'postgres'],
+    ['oracle', 'oracle db', 'pl/sql'],
+    ['sql server', 'mssql', 'tsql'],
+    ['mongodb', 'dynamodb', 'nosql'],
+    // インフラ
+    ['docker', 'kubernetes', 'k8s', 'コンテナ'],
+    ['terraform', 'cloudformation', 'iac'],
+    ['linux', 'unix', 'centos', 'ubuntu', 'rhel'],
+    // 管理系
+    ['pm', 'プロジェクトマネージャー', 'プロジェクトマネージャ', 'プロジェクト管理'],
+    ['pmo', 'プロジェクト管理支援'],
+    ['pl', 'プロジェクトリーダー', 'プロジェクトリーダ'],
+    ['se', 'システムエンジニア'],
+    ['pg', 'プログラマ', 'プログラマー'],
+    // テスト
+    ['テスト', 'qa', 'テスト設計', 'テスト実行', '品質管理'],
+    // SAP / ERP
+    ['sap', 'erp', 'sap fi', 'sap co', 'sap mm', 'sap sd'],
+    // AI / ML
+    ['ai', '機械学習', 'ml', 'deep learning', 'ディープラーニング'],
+    // セキュリティ
+    ['セキュリティ', 'cybersecurity', '情報セキュリティ', 'isms'],
+    // ネットワーク
+    ['ネットワーク', 'cisco', 'ccna', 'ccnp', 'firewall'],
+];
+
+// スキルの類似グループを検索
+function findSimilarSkills(skill) {
+    const norm = skill.toLowerCase();
+    for (const group of SKILL_GROUPS) {
+        if (group.includes(norm)) {
+            return group.filter(s => s !== norm);
+        }
+    }
+    return [];
+}
+
+function doMatching(projectId) {
+    const project = projectsCache.find(p => p.id === projectId);
+    if (!project) return;
+
+    const reqTags = parseTags(project.required_skill_tags);
+    const prefTags = parseTags(project.preferred_skill_tags);
+    const projIndustryTags = parseTags(project.industry_tags);
+    const allProjectTags = [...reqTags, ...prefTags];
+    const projPriceNum = parseFloat(project.purchase_price_num) || 0;
+    const projExpYears = parseFloat(project.required_experience_years) || 0;
+
+    // 既にマッチング登録済み（見送り以外）
+    const existingMemberIds = matchingsCache
+        .filter(mt => mt.project_id === projectId && mt.status !== '見送り')
+        .map(mt => mt.member_id);
+
+    const scored = membersCache.map(m => {
+        const memberTags = parseTags(m.skill_tags);
+        const memIndustryTags = parseTags(m.industry_tags);
+        const memPriceNum = parseFloat(m.desired_price_num) || 0;
+        const memExpYears = parseFloat(m.experience_years) || 0;
+
+        let score = 0;
+        const matchedRequired = [];
+        const matchedPreferred = [];
+        const matchedSimilar = [];
+        const matchedIndustry = [];
+        const penalties = [];
+
+        // --- 必須スキルタグ完全一致 → 3点 ---
+        reqTags.forEach(rt => {
+            if (memberTags.some(mt => mt === rt)) {
+                score += 3;
+                matchedRequired.push(rt);
+            } else {
+                // 類似スキルチェック → 1.5点
+                const similar = findSimilarSkills(rt);
+                const found = memberTags.find(mt => similar.includes(mt));
+                if (found) {
+                    score += 1.5;
+                    matchedSimilar.push(`${rt}≒${found}`);
+                }
+            }
+        });
+
+        // --- 尚可スキルタグ完全一致 → 1点 ---
+        prefTags.forEach(pt => {
+            if (memberTags.some(mt => mt === pt)) {
+                score += 1;
+                matchedPreferred.push(pt);
+            } else {
+                const similar = findSimilarSkills(pt);
+                const found = memberTags.find(mt => similar.includes(mt));
+                if (found) {
+                    score += 0.5;
+                    matchedSimilar.push(`${pt}≒${found}`);
+                }
+            }
+        });
+
+        // --- 業界タグ一致 → 2点/件 ---
+        projIndustryTags.forEach(it => {
+            if (memIndustryTags.some(mt => mt === it)) {
+                score += 2;
+                matchedIndustry.push(it);
+            }
+        });
+
+        // --- ポジション一致 → 2点 ---
+        if (project.role && m.desired_position) {
+            const roleNorm = project.role.toLowerCase();
+            const posNorm = m.desired_position.toLowerCase();
+            if (roleNorm.includes(posNorm) || posNorm.includes(roleNorm)) {
+                score += 2;
+            }
+        }
+
+        // --- 経験年数チェック ---
+        if (projExpYears > 0 && memExpYears > 0) {
+            if (memExpYears >= projExpYears) {
+                score += 1; // 満たしていれば +1
+            } else {
+                penalties.push(`経験${memExpYears}年 < 必要${projExpYears}年`);
+                score -= 1; // 不足は -1
+            }
+        }
+
+        // --- 単価レンジチェック ---
+        let priceNote = '';
+        if (projPriceNum > 0 && memPriceNum > 0) {
+            const diff = projPriceNum - memPriceNum;
+            if (diff >= 10) {
+                score += 1; // 余裕あり
+                priceNote = `余裕+${diff}万`;
+            } else if (diff >= 0) {
+                priceNote = `差${diff}万`;
+            } else {
+                // 希望単価 > 仕入単価 → 減点
+                score -= 2;
+                penalties.push(`単価超過${Math.abs(diff)}万`);
+                priceNote = `超過${Math.abs(diff)}万`;
+            }
+        }
+
+        // --- タグ未設定フォールバック ---
+        if (allProjectTags.length === 0 || memberTags.length === 0) {
+            const fallbackScore = calcFallbackScore(project, m);
+            score += fallbackScore;
+        }
+
+        const isExisting = existingMemberIds.includes(m.id);
+        const reqCoverage = reqTags.length > 0
+            ? Math.round((matchedRequired.length + matchedSimilar.filter(s => reqTags.some(rt => s.startsWith(rt))).length * 0.5) / reqTags.length * 100)
+            : null;
+
+        return { member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+
+    const resultsEl = document.getElementById('matching-results');
+    if (scored.length === 0) {
+        resultsEl.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>マッチする要員が見つかりませんでした</p></div>';
+        return;
+    }
+
+    resultsEl.innerHTML = scored.map(({ member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage }) => {
+        const existingLabel = isExisting ? '<span class="badge badge-interviewing" style="margin-left:6px;font-size:10px;">提案済</span>' : '';
+        const coverageLabel = reqCoverage !== null ? `<span style="font-size:11px;color:${reqCoverage >= 70 ? 'var(--success)' : reqCoverage >= 40 ? 'var(--warning)' : 'var(--danger)'};margin-left:6px;">必須${reqCoverage}%</span>` : '';
+        const opacity = isExisting ? 'opacity:0.55;' : '';
+        const priceLabel = priceNote ? `<span style="font-size:11px;margin-left:6px;color:var(--text-secondary);">💰${priceNote}</span>` : '';
+        const penaltyHtml = penalties.length > 0 ? `<div style="font-size:11px;color:var(--danger);margin-top:4px;">⚠ ${penalties.join(' / ')}</div>` : '';
+        return `
+        <div class="match-candidate" style="${opacity}">
+            <div class="match-candidate-header">
+                <span class="match-candidate-name">${escHtml(m.full_name || m.initial)} <span style="font-size:11px;color:var(--text-secondary)">(スコア: ${score.toFixed(1)})</span>${coverageLabel}${priceLabel}${existingLabel}</span>
+                <span class="match-candidate-price">${escHtml(m.desired_price || '-')}${m.experience_years ? ` / ${m.experience_years}年` : ''}</span>
+            </div>
+            <div class="match-candidate-skills">
+                ${matchedRequired.length > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--success);">必須:</span> ' + matchedRequired.map(t => `<span class="skill-tag" style="background:#d1fae5;color:#065f46;">${escHtml(t)}</span>`).join(' ') + ' ' : ''}
+                ${matchedPreferred.length > 0 ? '<span style="font-size:11px;font-weight:600;color:var(--info);">尚可:</span> ' + matchedPreferred.map(t => `<span class="skill-tag" style="background:#dbeafe;color:#1e40af;">${escHtml(t)}</span>`).join(' ') + ' ' : ''}
+                ${matchedSimilar.length > 0 ? '<span style="font-size:11px;font-weight:600;color:#7c3aed;">類似:</span> ' + matchedSimilar.map(t => `<span class="skill-tag" style="background:#ede9fe;color:#6b21a8;">${escHtml(t)}</span>`).join(' ') + ' ' : ''}
+                ${matchedIndustry.length > 0 ? '<span style="font-size:11px;font-weight:600;color:#92400e;">業界:</span> ' + matchedIndustry.map(t => `<span class="skill-tag" style="background:#fef3c7;color:#92400e;">${escHtml(t)}</span>`).join(' ') + ' ' : ''}
+                ${matchedRequired.length === 0 && matchedPreferred.length === 0 && matchedSimilar.length === 0 ? escHtml(truncate(m.skills_summary, 100)) : ''}
+            </div>
+            ${penaltyHtml}
+            <div class="match-candidate-actions">
+                ${isExisting ? '' : `<button class="btn btn-sm btn-primary" onclick="openMatchingForm('${projectId}', '${m.id}')"><i class="fas fa-plus"></i> マッチング登録</button>`}
+                <button class="btn btn-sm btn-secondary" onclick="showMemberDetail('${m.id}')"><i class="fas fa-eye"></i> 詳細</button>
+            </div>
+        </div>
+    `}).join('');
+}
+
+// フォールバック：旧キーワードマッチ（タグ未設定時用）
+function calcFallbackScore(project, member) {
+    const STOP_WORDS = new Set(['以上','経験','対応','可能','業務','開発','設計','担当','必須','不問','スキル','案件','要員','希望','年齢','歓迎','応募','作業','工程','知識','システム','プロジェクト','環境','求める','構築','管理','運用','保守','テスト','実装','製造','詳細','基本','概要']);
+    const projectText = `${project.required_skills} ${project.preferred_skills} ${project.role}`;
+    const memberText = `${member.skills_summary} ${member.experience_summary} ${member.desired_position}`;
+    const pWords = extractCleanKeywords(projectText, STOP_WORDS);
+    const mWords = extractCleanKeywords(memberText, STOP_WORDS);
+    let score = 0;
+    pWords.forEach(pw => {
+        if (mWords.some(mw => mw === pw)) score++;
+    });
+    return Math.min(score, 5); // フォールバックは最大5点に制限
+}
+
+function extractCleanKeywords(text, stopWords) {
+    if (!text) return [];
+    const cleaned = text.toLowerCase()
+        .replace(/[（）()「」【】■●・※\n\r]/g, ' ')
+        .replace(/[、。]/g, ' ');
+    const words = cleaned.split(/[\s,\/]+/).filter(w => w.length >= 2 && !stopWords.has(w));
+    return [...new Set(words)];
+}
+
+function parseTags(str) {
+    if (!str) return [];
+    return str.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+}
+
+function extractKeywords(text) {
+    if (!text) return [];
+    const cleaned = text.toLowerCase()
+        .replace(/[（）()「」【】■●・※\n\r]/g, ' ')
+        .replace(/[、。]/g, ' ');
+    const words = cleaned.split(/[\s,\/]+/).filter(w => w.length >= 2);
+    return [...new Set(words)];
+}
+
+function openMatchingForm(projectId, memberId) {
+    const p = projectsCache.find(x => x.id === projectId);
+    const m = membersCache.find(x => x.id === memberId);
+    document.getElementById('mtf-id').value = '';
+    document.getElementById('mtf-project_id').value = projectId;
+    document.getElementById('mtf-member_id').value = memberId;
+    document.getElementById('mtf-project-label').value = p ? (p.project_name_rewrite || p.project_name_original) : '';
+    document.getElementById('mtf-member-label').value = m ? (m.full_name || m.initial) : '';
+    document.getElementById('mtf-status').value = '候補';
+    document.getElementById('mtf-proposed_date').value = '';
+    document.getElementById('mtf-interview_date').value = '';
+    document.getElementById('mtf-note').value = '';
+    openModal('modal-matching-form');
+}
+
+function renderMatchings() {
+    const tbody = document.getElementById('matchings-tbody');
+    if (matchingsCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><i class="fas fa-handshake"></i><p>マッチング履歴なし</p></td></tr>';
+        return;
+    }
+
+    const STATUSES = ['候補','提案中','面談調整中','面談済','内定','参画決定','見送り'];
+
+    tbody.innerHTML = matchingsCache.map(mt => {
+        const p = projectsCache.find(x => x.id === mt.project_id);
+        const m = membersCache.find(x => x.id === mt.member_id);
+        const statusOptions = STATUSES.map(s =>
+            `<option value="${s}" ${mt.status === s ? 'selected' : ''}>${s}</option>`
+        ).join('');
+        return `
+            <tr>
+                <td>${escHtml(truncate(p ? (p.project_name_rewrite || p.project_name_original) : '-', 25))}</td>
+                <td>${escHtml(m ? (m.full_name || m.initial) : '-')}</td>
+                <td><select class="inline-status-select" onchange="quickUpdateMatchingStatus('${mt.id}', this.value)">${statusOptions}</select></td>
+                <td>${escHtml(mt.proposed_date || '-')}</td>
+                <td>${escHtml(mt.interview_date || '-')}</td>
+                <td>${escHtml(truncate(mt.note, 30))}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="editMatching('${mt.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteMatching('${mt.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function quickUpdateMatchingStatus(id, newStatus) {
+    try {
+        await fetch(`${API_BASE}/matchings/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        // キャッシュ更新
+        const mt = matchingsCache.find(x => x.id === id);
+        if (mt) mt.status = newStatus;
+        showToast(`ステータスを「${newStatus}」に変更しました`);
+        logActivity('ステータス変更', 'matchings', id, '', newStatus);
+        renderDashboard();
+    } catch (e) {
+        showToast('更新に失敗しました');
+    }
+}
+
+function editMatching(id) {
+    const mt = matchingsCache.find(x => x.id === id);
+    if (!mt) return;
+    const p = projectsCache.find(x => x.id === mt.project_id);
+    const m = membersCache.find(x => x.id === mt.member_id);
+    document.getElementById('mtf-id').value = mt.id;
+    document.getElementById('mtf-project_id').value = mt.project_id;
+    document.getElementById('mtf-member_id').value = mt.member_id;
+    document.getElementById('mtf-project-label').value = p ? (p.project_name_rewrite || p.project_name_original) : '';
+    document.getElementById('mtf-member-label').value = m ? (m.full_name || m.initial) : '';
+    document.getElementById('mtf-status').value = mt.status || '候補';
+    document.getElementById('mtf-proposed_date').value = mt.proposed_date || '';
+    document.getElementById('mtf-interview_date').value = mt.interview_date || '';
+    document.getElementById('mtf-note').value = mt.note || '';
+    openModal('modal-matching-form');
+}
+
+async function deleteMatching(id) {
+    if (!confirm('このマッチングを削除しますか？')) return;
+    await deleteRecord('matchings', id);
+    await loadAllData();
+    renderMatchings();
+    renderDashboard();
+    showToast('マッチングを削除しました');
+}
+
+// ---- Forms ----
+function initForms() {
+    // Add Project Button
+    document.getElementById('btn-add-project').addEventListener('click', () => {
+        document.getElementById('project-form-title').textContent = '案件追加';
+        document.getElementById('project-form').reset();
+        document.getElementById('pf-id').value = '';
+        document.getElementById('pf-status').value = 'Open';
+        document.getElementById('pf-shareable').value = 'OK';
+        document.getElementById('pf-required_skill_tags').value = '';
+        document.getElementById('pf-preferred_skill_tags').value = '';
+        initTagInput('pf-required_skill_tags');
+        initTagInput('pf-preferred_skill_tags');
+        openModal('modal-project-form');
+    });
+
+    // Add Member Button
+    document.getElementById('btn-add-member').addEventListener('click', () => {
+        document.getElementById('member-form-title').textContent = '要員追加';
+        document.getElementById('member-form').reset();
+        document.getElementById('mf-id').value = '';
+        document.getElementById('mf-process').value = '案件検索中';
+        document.getElementById('mf-skill_tags').value = '';
+        initTagInput('mf-skill_tags');
+        openModal('modal-member-form');
+    });
+
+    // Project Form Submit
+    document.getElementById('project-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fields = ['status','shareable','share_note','added_date','source','project_name_original','project_name_rewrite',
+            'client_price','purchase_price','role','location','work_style','period','headcount','required_skills','preferred_skills',
+            'required_skill_tags','preferred_skill_tags',
+            'age_limit','nationality','english','commercial_flow','interview_count'];
+        const data = {};
+        fields.forEach(f => { data[f] = document.getElementById('pf-' + f).value; });
+        const id = document.getElementById('pf-id').value;
+        if (id) {
+            await updateRecord('projects', id, data);
+            showToast('案件を更新しました');
+            logActivity('案件更新', 'projects', id, data.project_name_rewrite || data.project_name_original, '');
+        } else {
+            const created = await createRecord('projects', data);
+            showToast('案件を追加しました');
+            logActivity('案件追加', 'projects', created?.id || '', data.project_name_rewrite || data.project_name_original, '');
+        }
+        closeModal('modal-project-form');
+        await loadAllData();
+        renderProjects(getProjectFilters());
+        renderDashboard();
+        renderMatchingPage();
+    });
+
+    // Member Form Submit
+    document.getElementById('member-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fields = ['process','affiliation','full_name','initial','contract_employee','desired_price',
+            'contact','desired_position','nearest_station','available_date','work_preference',
+            'skill_sheet_url','skill_tags','skills_summary','experience_summary','sales_comment'];
+        const data = {};
+        fields.forEach(f => { data[f] = document.getElementById('mf-' + f).value; });
+        const id = document.getElementById('mf-id').value;
+        if (id) {
+            await updateRecord('members', id, data);
+            showToast('要員を更新しました');
+            logActivity('要員更新', 'members', id, data.full_name || data.initial, '');
+        } else {
+            const created = await createRecord('members', data);
+            showToast('要員を追加しました');
+            logActivity('要員追加', 'members', created?.id || '', data.full_name || data.initial, '');
+        }
+        closeModal('modal-member-form');
+        await loadAllData();
+        renderMembers(document.getElementById('member-search').value);
+        renderDashboard();
+        renderMatchingPage();
+    });
+
+    // Matching Form Submit
+    document.getElementById('matching-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            project_id: document.getElementById('mtf-project_id').value,
+            member_id: document.getElementById('mtf-member_id').value,
+            status: document.getElementById('mtf-status').value,
+            proposed_date: document.getElementById('mtf-proposed_date').value,
+            interview_date: document.getElementById('mtf-interview_date').value,
+            note: document.getElementById('mtf-note').value,
+        };
+        const id = document.getElementById('mtf-id').value;
+        if (id) {
+            await updateRecord('matchings', id, data);
+            showToast('マッチングを更新しました');
+            logActivity('マッチング更新', 'matchings', id, '', data.status);
+        } else {
+            const created = await createRecord('matchings', data);
+            showToast('マッチングを登録しました');
+            logActivity('マッチング登録', 'matchings', created?.id || '', '', data.status);
+        }
+        closeModal('modal-matching-form');
+        await loadAllData();
+        renderMatchings();
+        renderDashboard();
+    });
+}
+
+// ---- Export ----
+function initExport() {
+    document.getElementById('btn-export-project').addEventListener('click', () => exportToExcel('projects'));
+    document.getElementById('btn-export-member').addEventListener('click', () => exportToExcel('members'));
+}
+
+function exportToExcel(type) {
+    const EXPORT_COLS = {
+        projects: [
+            { key: 'status', label: 'ステータス' },
+            { key: 'shareable', label: '共有可否' },
+            { key: 'added_date', label: '追加日' },
+            { key: 'source', label: '案件元' },
+            { key: 'project_name_rewrite', label: '案件名' },
+            { key: 'role', label: '募集職種' },
+            { key: 'client_price', label: '元単価' },
+            { key: 'purchase_price', label: '仕入単価' },
+            { key: 'location', label: '勤務地' },
+            { key: 'work_style', label: '働き方' },
+            { key: 'period', label: '期間' },
+            { key: 'required_skill_tags', label: '必須スキルタグ' },
+            { key: 'preferred_skill_tags', label: '尚可スキルタグ' },
+            { key: 'industry_tags', label: '業界タグ' },
+            { key: 'required_skills', label: '必須スキル' },
+            { key: 'preferred_skills', label: '尚可スキル' },
+            { key: 'age_limit', label: '年齢制限' },
+            { key: 'nationality', label: '外国籍' },
+            { key: 'commercial_flow', label: '商流制限' },
+            { key: 'interview_count', label: '面談回数' },
+        ],
+        members: [
+            { key: 'process', label: 'プロセス' },
+            { key: 'full_name', label: '要員名' },
+            { key: 'initial', label: 'イニシャル' },
+            { key: 'affiliation', label: '所属先' },
+            { key: 'desired_price', label: '希望単価' },
+            { key: 'desired_position', label: '希望ポジション' },
+            { key: 'skill_tags', label: 'スキルタグ' },
+            { key: 'industry_tags', label: '業界タグ' },
+            { key: 'experience_years', label: '経験年数' },
+            { key: 'nearest_station', label: '最寄駅' },
+            { key: 'available_date', label: '稼働可能日' },
+            { key: 'work_preference', label: '勤務形態' },
+            { key: 'skills_summary', label: 'スキル一覧' },
+            { key: 'experience_summary', label: '経験一覧' },
+            { key: 'sales_comment', label: '営業コメント' },
+            { key: 'skill_sheet_url', label: 'スキルシートURL' },
+        ]
+    };
+
+    const cols = EXPORT_COLS[type];
+    const data = type === 'projects' ? projectsCache : membersCache;
+    const rows = data.map(r => {
+        const row = {};
+        cols.forEach(c => { row[c.label] = r[c.key] || ''; });
+        return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, type === 'projects' ? '案件' : '要員');
+
+    const filename = type === 'projects'
+        ? `案件一覧_${formatDateForFile()}.xlsx`
+        : `要員一覧_${formatDateForFile()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showToast(`${rows.length}件をエクスポートしました`);
+}
+
+function formatDateForFile() {
+    const d = new Date();
+    return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ---- Filters ----
+function initFilters() {
+    document.getElementById('project-search').addEventListener('input', () => renderProjects(getProjectFilters()));
+    document.getElementById('filter-shareable').addEventListener('change', () => renderProjects(getProjectFilters()));
+    document.getElementById('filter-workstyle').addEventListener('change', () => renderProjects(getProjectFilters()));
+    document.getElementById('member-search').addEventListener('input', (e) => renderMembers(e.target.value));
+}
+
+function getProjectFilters() {
+    return {
+        search: document.getElementById('project-search').value,
+        shareable: document.getElementById('filter-shareable').value,
+        workstyle: document.getElementById('filter-workstyle').value,
+    };
+}
+
+// ---- Activity Log ----
+let activityCache = [];
+let notesCache = [];
+
+async function loadActivityLogs() {
+    try {
+        const [actRes, noteRes] = await Promise.all([
+            fetch(`${API_BASE}/activity_logs?limit=30&sort=-created_at`),
+            fetch(`${API_BASE}/notes?limit=500&sort=-created_at`)
+        ]);
+        const actData = await actRes.json();
+        const noteData = await noteRes.json();
+        activityCache = actData.data || [];
+        notesCache = noteData.data || [];
+    } catch (e) {
+        activityCache = [];
+        notesCache = [];
+    }
+}
+
+async function logActivity(action, targetTable, targetId, targetName, detail) {
+    try {
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        await createRecord('activity_logs', { action, target_table: targetTable, target_id: targetId, target_name: targetName, detail, timestamp });
+    } catch (e) {
+        console.error('Activity log error:', e);
+    }
+}
+
+function renderActivityLog() {
+    const el = document.getElementById('activity-log-list');
+    if (activityCache.length === 0) {
+        el.innerHTML = '<div class="empty-state"><i class="fas fa-stream"></i><p>アクティビティなし</p></div>';
+        return;
+    }
+    const ACTION_ICONS = {
+        '案件追加': '📋', '案件更新': '✏️', '案件削除': '🗑️',
+        '要員追加': '👤', '要員更新': '✏️', '要員削除': '🗑️',
+        'マッチング登録': '🤝', 'マッチング更新': '🔄', 'マッチング削除': '🗑️',
+        '一括更新': '⚡', 'ステータス変更': '🔄', 'インポート': '📥', 'エクスポート': '📤',
+    };
+    el.innerHTML = activityCache.slice(0, 20).map(log => `
+        <div class="recent-item" style="cursor:default;">
+            <span class="recent-item-name">${ACTION_ICONS[log.action] || '📝'} <strong>${escHtml(log.action)}</strong> ${escHtml(log.target_name || '')} ${log.detail ? `<span style="color:var(--text-secondary);font-size:12px;">- ${escHtml(log.detail)}</span>` : ''}</span>
+            <span class="recent-item-meta">${escHtml(log.timestamp || '')}</span>
+        </div>
+    `).join('');
+}
+
+// ---- Notes / Comments ----
+function renderNotesSection(targetTable, targetId) {
+    const notes = notesCache.filter(n => n.target_table === targetTable && n.target_id === targetId);
+    const notesList = notes.length > 0
+        ? notes.map(n => `
+            <div class="note-item">
+                <div class="note-content">${escHtml(n.content)}</div>
+                <div class="note-meta">
+                    <span>${escHtml(n.timestamp || '')}</span>
+                    <button class="btn btn-sm btn-danger" onclick="deleteNote('${n.id}', '${targetTable}', '${targetId}')"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('')
+        : '<p style="font-size:13px;color:var(--text-secondary);">メモなし</p>';
+
+    return `
+        <div class="detail-section">
+            <h4><i class="fas fa-sticky-note" style="color:var(--primary);margin-right:4px;font-size:13px;"></i>メモ（${notes.length}件）</h4>
+            <div class="notes-list">${notesList}</div>
+            <div class="note-form">
+                <textarea id="note-input-${targetId}" rows="2" placeholder="メモを入力..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;outline:none;resize:vertical;"></textarea>
+                <button class="btn btn-sm btn-primary" onclick="addNote('${targetTable}', '${targetId}')" style="margin-top:6px;"><i class="fas fa-plus"></i> メモ追加</button>
+            </div>
+        </div>
+    `;
+}
+
+async function addNote(targetTable, targetId) {
+    const input = document.getElementById(`note-input-${targetId}`);
+    const content = input.value.trim();
+    if (!content) return;
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    await createRecord('notes', { target_table: targetTable, target_id: targetId, content, timestamp });
+    await loadActivityLogs();
+    // 詳細モーダルを再描画
+    if (targetTable === 'projects') showProjectDetail(targetId);
+    else if (targetTable === 'members') showMemberDetail(targetId);
+    showToast('メモを追加しました');
+}
+
+async function deleteNote(noteId, targetTable, targetId) {
+    if (!confirm('このメモを削除しますか？')) return;
+    await deleteRecord('notes', noteId);
+    await loadActivityLogs();
+    if (targetTable === 'projects') showProjectDetail(targetId);
+    else if (targetTable === 'members') showMemberDetail(targetId);
+    showToast('メモを削除しました');
+}
+
+// ---- Helpers ----
+function escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function truncate(str, len) {
+    if (!str) return '-';
+    return str.length > len ? str.substring(0, len) + '...' : str;
+}
+
+function getProcessBadge(process) {
+    const map = {
+        '案件検索中': { cls: 'badge-searching' },
+        '提案中': { cls: 'badge-proposed' },
+        '面談調整中': { cls: 'badge-interviewing' },
+        '面談済': { cls: 'badge-interviewed' },
+        '内定': { cls: 'badge-offered' },
+        '参画中': { cls: 'badge-active' },
+        '終了': { cls: 'badge-closed' },
+    };
+    return map[process] || { cls: 'badge-open' };
+}
+
+function getMatchingBadge(status) {
+    const map = {
+        '候補': { cls: 'badge-candidate' },
+        '提案中': { cls: 'badge-proposed' },
+        '面談調整中': { cls: 'badge-interviewing' },
+        '面談済': { cls: 'badge-interviewed' },
+        '内定': { cls: 'badge-offered' },
+        '参画決定': { cls: 'badge-decided' },
+        '見送り': { cls: 'badge-rejected' },
+    };
+    return map[status] || { cls: 'badge-open' };
+}
+// ============================================
+// SES案件マッチング管理ツール - Import Module
+// ============================================
+
+const ImportModule = (() => {
+    let currentTarget = ''; // 'projects' or 'members'
+    let parsedHeaders = [];
+    let parsedRows = [];
+    let columnMapping = {};
+
+    // DB field definitions
+    const FIELD_DEFS = {
+        projects: [
+            { key: 'status', label: 'ステータス' },
+            { key: 'shareable', label: '共有可否' },
+            { key: 'share_note', label: '共有NG理由' },
+            { key: 'added_date', label: '追加日' },
+            { key: 'source', label: '案件元/ツール' },
+            { key: 'project_name_original', label: '案件名(原文)' },
+            { key: 'project_name_rewrite', label: '案件名(リライト)' },
+            { key: 'client_price', label: '元単価' },
+            { key: 'purchase_price', label: '仕入単価' },
+            { key: 'purchase_price_num', label: '仕入単価(数値・万円)' },
+            { key: 'role', label: '募集職種' },
+            { key: 'location', label: '勤務地' },
+            { key: 'work_style', label: '働き方' },
+            { key: 'period', label: '期間' },
+            { key: 'headcount', label: '募集人数' },
+            { key: 'required_skills', label: '必須スキル' },
+            { key: 'preferred_skills', label: '尚可スキル' },
+            { key: 'required_skill_tags', label: '必須スキルタグ' },
+            { key: 'preferred_skill_tags', label: '尚可スキルタグ' },
+            { key: 'industry_tags', label: '業界タグ' },
+            { key: 'required_experience_years', label: '必要経験年数' },
+            { key: 'description_original', label: '案件内容(原文)' },
+            { key: 'description_rewrite', label: '案件内容(リライト)' },
+            { key: 'age_limit', label: '年齢制限' },
+            { key: 'nationality', label: '外国籍可否' },
+            { key: 'english', label: '英語要件' },
+            { key: 'commercial_flow', label: '商流制限' },
+            { key: 'interview_count', label: '面談回数' },
+        ],
+        members: [
+            { key: 'process', label: 'プロセス' },
+            { key: 'affiliation', label: '所属先/経由元' },
+            { key: 'full_name', label: '要員名（本名）' },
+            { key: 'initial', label: 'イニシャル' },
+            { key: 'contract_employee', label: '契約社員化' },
+            { key: 'desired_price', label: '希望単価' },
+            { key: 'desired_price_num', label: '希望単価(数値・万円)' },
+            { key: 'contact', label: '連絡先' },
+            { key: 'desired_position', label: '希望ポジション' },
+            { key: 'skill_sheet_url', label: 'スキルシートURL' },
+            { key: 'skill_tags', label: 'スキルタグ' },
+            { key: 'industry_tags', label: '業界タグ' },
+            { key: 'experience_years', label: '経験年数' },
+            { key: 'proposal_text', label: '提案文' },
+            { key: 'sales_comment', label: '営業コメント' },
+            { key: 'skills_summary', label: 'スキル一覧' },
+            { key: 'experience_summary', label: '経験一覧' },
+            { key: 'nearest_station', label: '最寄駅' },
+            { key: 'available_date', label: '稼働可能日' },
+            { key: 'work_preference', label: '勤務形態希望' },
+        ]
+    };
+
+    // Auto-mapping rules: source header → DB field
+    const AUTO_MAP = {
+        projects: {
+            'ステータス': 'status',
+            '共有可否': 'shareable',
+            '追加日': 'added_date',
+            '案件元': 'source',
+            '案件元/ツール': 'source',
+            '案件名(原文)': 'project_name_original',
+            '案件名(リライト)': 'project_name_rewrite',
+            '元単価': 'client_price',
+            '仕入単価': 'purchase_price',
+            '仕入単価(数値)': 'purchase_price_num',
+            '仕入単価(万円)': 'purchase_price_num',
+            '募集職種': 'role',
+            '勤務地': 'location',
+            '働き方': 'work_style',
+            '期間': 'period',
+            '募集人数': 'headcount',
+            '必須スキル': 'required_skills',
+            '尚可スキル': 'preferred_skills',
+            '案件内容(原文)': 'description_original',
+            '案件内容(リライト)': 'description_rewrite',
+            '年齢制限': 'age_limit',
+            '外国籍': 'nationality',
+            '外国籍可否': 'nationality',
+            '英語': 'english',
+            '英語要件': 'english',
+            '商流制限': 'commercial_flow',
+            '面談回数': 'interview_count',
+            '面談': 'interview_count',
+            '必須スキルタグ': 'required_skill_tags',
+            '尚可スキルタグ': 'preferred_skill_tags',
+            '業界タグ': 'industry_tags',
+            '業界': 'industry_tags',
+            '必要経験年数': 'required_experience_years',
+            '経験年数(必要)': 'required_experience_years',
+        },
+        members: {
+            'プロセス': 'process',
+            '所属先/経由元': 'affiliation',
+            '所属先': 'affiliation',
+            '要員名（本名）': 'full_name',
+            '要員名': 'full_name',
+            'イニシャル': 'initial',
+            '契約社員化': 'contract_employee',
+            '希望単価': 'desired_price',
+            '連絡先': 'contact',
+            '希望ポジション': 'desired_position',
+            'スキルシート': 'skill_sheet_url',
+            'スキルシートURL': 'skill_sheet_url',
+            '提案文': 'proposal_text',
+            '営業コメント': 'sales_comment',
+            'スキル一覧': 'skills_summary',
+            '経験一覧': 'experience_summary',
+            '最寄駅': 'nearest_station',
+            '稼働可能日': 'available_date',
+            '勤務形態': 'work_preference',
+            '勤務形態希望': 'work_preference',
+            'スキルタグ': 'skill_tags',
+            '業界タグ': 'industry_tags',
+            '業界': 'industry_tags',
+            '経験年数': 'experience_years',
+            '希望単価(数値)': 'desired_price_num',
+            '希望単価(万円)': 'desired_price_num',
+        }
+    };
+
+    // ---- Open Import Modal ----
+    function open(target) {
+        currentTarget = target;
+        parsedHeaders = [];
+        parsedRows = [];
+        columnMapping = {};
+
+        document.getElementById('import-modal-title').textContent =
+            target === 'projects' ? '案件データ インポート' : '要員データ インポート';
+
+        // Reset state
+        document.getElementById('import-preview-section').style.display = 'none';
+        document.getElementById('json-input').value = '';
+        document.getElementById('text-input').value = '';
+
+        // Reset tabs
+        document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.import-tab[data-tab="excel"]').classList.add('active');
+        document.querySelectorAll('.import-tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-excel').classList.add('active');
+
+        // Reset dropzones
+        document.querySelectorAll('.drop-zone').forEach(dz => {
+            dz.classList.remove('drop-zone-loaded');
+            const nameEl = dz.querySelector('.drop-zone-filename');
+            if (nameEl) nameEl.remove();
+        });
+        document.getElementById('file-excel').value = '';
+        document.getElementById('file-csv').value = '';
+
+        openModal('modal-import');
+    }
+
+    // ---- Tab Switching ----
+    function initTabs() {
+        document.querySelectorAll('.import-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.import-tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+    }
+
+    // ---- Excel File Handler ----
+    function handleExcel(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                if (raw.length < 2) {
+                    showToast('データが不足しています（ヘッダー+1行以上必要）');
+                    return;
+                }
+
+                // Detect orientation: check if data is row-based or column-based
+                // Heuristic: if the first column has known header names, data might be transposed (Excel format from user)
+                const firstCol = raw.map(r => String(r[0] || '').trim());
+                const knownHeaders = Object.keys(AUTO_MAP[currentTarget] || {});
+                const matchCount = firstCol.filter(v => knownHeaders.includes(v)).length;
+
+                if (matchCount >= 3 && matchCount > raw[0].filter(v => knownHeaders.includes(String(v || '').trim())).length) {
+                    // Data is transposed (headers in first column, data in subsequent columns)
+                    const headers = firstCol;
+                    const rows = [];
+                    for (let col = 1; col < raw[0].length; col++) {
+                        const row = {};
+                        headers.forEach((h, i) => {
+                            if (h) row[h] = raw[i] ? String(raw[i][col] || '') : '';
+                        });
+                        rows.push(row);
+                    }
+                    parsedHeaders = headers.filter(Boolean);
+                    parsedRows = rows;
+                } else {
+                    // Standard orientation (headers in first row)
+                    parsedHeaders = raw[0].map(h => String(h || '').trim());
+                    parsedRows = raw.slice(1).map(r => {
+                        const obj = {};
+                        parsedHeaders.forEach((h, i) => { obj[h] = String(r[i] || ''); });
+                        return obj;
+                    }).filter(r => Object.values(r).some(v => v.trim()));
+                }
+
+                markFileLoaded('drop-zone-excel', file.name);
+                autoMap();
+                showPreview();
+            } catch (err) {
+                console.error(err);
+                showToast('Excelの読み込みに失敗しました: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // ---- CSV File Handler ----
+    function handleCSV(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target.result;
+                parseCSVText(text);
+                markFileLoaded('drop-zone-csv', file.name);
+                autoMap();
+                showPreview();
+            } catch (err) {
+                showToast('CSVの読み込みに失敗しました');
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function parseCSVText(text, delimiter = ',') {
+        // Simple CSV parser that handles quoted fields
+        const lines = [];
+        let current = [];
+        let field = '';
+        let inQuote = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQuote) {
+                if (ch === '"' && text[i+1] === '"') {
+                    field += '"';
+                    i++;
+                } else if (ch === '"') {
+                    inQuote = false;
+                } else {
+                    field += ch;
+                }
+            } else {
+                if (ch === '"') {
+                    inQuote = true;
+                } else if (ch === delimiter) {
+                    current.push(field);
+                    field = '';
+                } else if (ch === '\n' || (ch === '\r' && text[i+1] === '\n')) {
+                    current.push(field);
+                    field = '';
+                    if (current.some(c => c.trim())) lines.push(current);
+                    current = [];
+                    if (ch === '\r') i++;
+                } else {
+                    field += ch;
+                }
+            }
+        }
+        current.push(field);
+        if (current.some(c => c.trim())) lines.push(current);
+
+        if (lines.length < 2) {
+            showToast('データが不足しています');
+            return;
+        }
+
+        parsedHeaders = lines[0].map(h => h.trim());
+        parsedRows = lines.slice(1).map(row => {
+            const obj = {};
+            parsedHeaders.forEach((h, i) => { obj[h] = (row[i] || '').trim(); });
+            return obj;
+        }).filter(r => Object.values(r).some(v => v));
+    }
+
+    // ---- JSON Template ----
+    function copyJsonTemplate() {
+        const fields = FIELD_DEFS[currentTarget] || [];
+        const sample = {};
+        fields.forEach(f => { sample[f.key] = ''; });
+        const template = JSON.stringify([sample], null, 2);
+        navigator.clipboard.writeText(template).then(() => {
+            showToast('テンプレートをクリップボードにコピーしました');
+        }).catch(() => {
+            // Fallback: テキストエリアに直接挿入
+            document.getElementById('json-input').value = template;
+            showToast('テンプレートをテキストエリアに挿入しました');
+        });
+    }
+
+    // ---- JSON Parse ----
+    function parseJSON() {
+        try {
+            const input = document.getElementById('json-input').value.trim();
+            const data = JSON.parse(input);
+            if (!Array.isArray(data) || data.length === 0) {
+                showToast('JSON配列形式で1件以上のデータが必要です');
+                return;
+            }
+            parsedHeaders = [...new Set(data.flatMap(d => Object.keys(d)))];
+            parsedRows = data.map(d => {
+                const obj = {};
+                parsedHeaders.forEach(h => { obj[h] = String(d[h] || ''); });
+                return obj;
+            });
+            autoMap();
+            showPreview();
+        } catch (err) {
+            showToast('JSONの解析に失敗しました: ' + err.message);
+        }
+    }
+
+    // ---- Text Parse ----
+    function parseText() {
+        const text = document.getElementById('text-input').value;
+        if (!text.trim()) {
+            showToast('テキストを入力してください');
+            return;
+        }
+        const delimType = document.getElementById('text-delimiter').value;
+        const delim = delimType === 'tab' ? '\t' : ',';
+        const hasHeader = document.getElementById('text-has-header').checked;
+
+        const lines = text.split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim());
+        if (lines.length < (hasHeader ? 2 : 1)) {
+            showToast('データが不足しています');
+            return;
+        }
+
+        const splitLines = lines.map(l => l.split(delim));
+
+        if (hasHeader) {
+            parsedHeaders = splitLines[0].map(h => h.trim());
+            parsedRows = splitLines.slice(1).map(row => {
+                const obj = {};
+                parsedHeaders.forEach((h, i) => { obj[h] = (row[i] || '').trim(); });
+                return obj;
+            }).filter(r => Object.values(r).some(v => v));
+        } else {
+            parsedHeaders = splitLines[0].map((_, i) => `列${i + 1}`);
+            parsedRows = splitLines.map(row => {
+                const obj = {};
+                parsedHeaders.forEach((h, i) => { obj[h] = (row[i] || '').trim(); });
+                return obj;
+            }).filter(r => Object.values(r).some(v => v));
+        }
+
+        autoMap();
+        showPreview();
+    }
+
+    // ---- Auto Mapping (完全一致のみ) ----
+    function autoMap() {
+        columnMapping = {};
+        const maps = AUTO_MAP[currentTarget] || {};
+        const fields = FIELD_DEFS[currentTarget] || [];
+        parsedHeaders.forEach(h => {
+            const clean = h.trim();
+            // 1. AUTO_MAP辞書で完全一致
+            if (maps[clean]) {
+                columnMapping[h] = maps[clean];
+                return;
+            }
+            // 2. DBフィールドキー名と完全一致
+            const directMatch = fields.find(f => f.key === clean);
+            if (directMatch) {
+                columnMapping[h] = directMatch.key;
+            }
+        });
+    }
+
+    // ---- Show Preview ----
+    function showPreview() {
+        const section = document.getElementById('import-preview-section');
+        section.style.display = 'block';
+        document.getElementById('import-row-count').textContent = parsedRows.length;
+
+        // Render mapping grid
+        const fields = FIELD_DEFS[currentTarget] || [];
+        const mappingGrid = document.getElementById('mapping-grid');
+        mappingGrid.innerHTML = parsedHeaders.map(h => {
+            const options = fields.map(f =>
+                `<option value="${f.key}" ${columnMapping[h] === f.key ? 'selected' : ''}>${f.label}</option>`
+            ).join('');
+            return `
+                <div class="mapping-item">
+                    <div class="mapping-source" title="${escHtml(h)}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>${escHtml(truncate(h, 20))}</span>
+                    </div>
+                    <div class="mapping-arrow"><i class="fas fa-arrow-right"></i></div>
+                    <select class="mapping-select" data-source="${escHtml(h)}">
+                        <option value="">-- スキップ --</option>
+                        ${options}
+                    </select>
+                </div>
+            `;
+        }).join('');
+
+        // Listen for mapping changes
+        mappingGrid.querySelectorAll('.mapping-select').forEach(sel => {
+            sel.addEventListener('change', () => {
+                const source = sel.dataset.source;
+                if (sel.value) {
+                    columnMapping[source] = sel.value;
+                } else {
+                    delete columnMapping[source];
+                }
+                renderPreviewTable();
+            });
+        });
+
+        renderPreviewTable();
+    }
+
+    function renderPreviewTable() {
+        const thead = document.getElementById('import-preview-thead');
+        const tbody = document.getElementById('import-preview-tbody');
+        const fields = FIELD_DEFS[currentTarget] || [];
+
+        // Get mapped fields
+        const mappedFields = [];
+        for (const [source, target] of Object.entries(columnMapping)) {
+            const fieldDef = fields.find(f => f.key === target);
+            if (fieldDef) {
+                mappedFields.push({ source, target, label: fieldDef.label });
+            }
+        }
+
+        if (mappedFields.length === 0) {
+            thead.innerHTML = '<tr><th>マッピングされたカラムがありません</th></tr>';
+            tbody.innerHTML = '';
+            return;
+        }
+
+        thead.innerHTML = '<tr>' + mappedFields.map(f => `<th>${escHtml(f.label)}</th>`).join('') + '</tr>';
+        tbody.innerHTML = parsedRows.slice(0, 5).map(row => {
+            return '<tr>' + mappedFields.map(f => {
+                const val = row[f.source] || '';
+                return `<td title="${escHtml(val)}">${escHtml(truncate(val, 40))}</td>`;
+            }).join('') + '</tr>';
+        }).join('');
+    }
+
+    // ---- Execute Import ----
+    async function executeImport() {
+        const fields = FIELD_DEFS[currentTarget] || [];
+        const mappedFields = [];
+        for (const [source, target] of Object.entries(columnMapping)) {
+            if (fields.find(f => f.key === target)) {
+                mappedFields.push({ source, target });
+            }
+        }
+
+        if (mappedFields.length === 0) {
+            showToast('カラムマッピングを設定してください');
+            return;
+        }
+
+        const mode = document.getElementById('import-mode').value;
+        const records = parsedRows.map(row => {
+            const rec = {};
+            mappedFields.forEach(({ source, target }) => {
+                rec[target] = row[source] || '';
+            });
+            return rec;
+        }).filter(r => Object.values(r).some(v => v));
+
+        if (records.length === 0) {
+            showToast('インポート可能なデータがありません');
+            return;
+        }
+
+        const btn = document.getElementById('btn-import-execute');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
+
+        try {
+            // Replace mode: delete existing records first
+            if (mode === 'replace') {
+                const existing = currentTarget === 'projects' ? projectsCache : membersCache;
+                for (const rec of existing) {
+                    await deleteRecord(currentTarget, rec.id);
+                }
+            }
+
+            // Batch create records (in chunks to avoid overload)
+            const chunkSize = 5;
+            let imported = 0;
+            for (let i = 0; i < records.length; i += chunkSize) {
+                const chunk = records.slice(i, i + chunkSize);
+                await Promise.all(chunk.map(r => createRecord(currentTarget, r)));
+                imported += chunk.length;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${imported}/${records.length}件...`;
+            }
+
+            showToast(`${records.length}件のデータをインポートしました`);
+            closeModal('modal-import');
+
+            // Refresh data
+            await loadAllData();
+            renderDashboard();
+            renderProjects(getProjectFilters());
+            renderMembers(document.getElementById('member-search').value);
+            renderMatchingPage();
+        } catch (err) {
+            console.error(err);
+            showToast('インポート中にエラーが発生しました: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-database"></i> インポート実行';
+        }
+    }
+
+    // ---- Helpers ----
+    function markFileLoaded(zoneId, filename) {
+        const zone = document.getElementById(zoneId);
+        zone.classList.add('drop-zone-loaded');
+        let nameEl = zone.querySelector('.drop-zone-filename');
+        if (!nameEl) {
+            nameEl = document.createElement('p');
+            nameEl.className = 'drop-zone-filename';
+            zone.appendChild(nameEl);
+        }
+        nameEl.innerHTML = `<i class="fas fa-check-circle"></i> ${escHtml(filename)}`;
+    }
+
+    // ---- Drag & Drop ----
+    function initDropZone(zoneId, fileInputId, handler) {
+        const zone = document.getElementById(zoneId);
+        const fileInput = document.getElementById(fileInputId);
+
+        ['dragenter', 'dragover'].forEach(ev => {
+            zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('drop-zone-active'); });
+        });
+        ['dragleave', 'drop'].forEach(ev => {
+            zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('drop-zone-active'); });
+        });
+
+        zone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length) handler(files[0]);
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handler(fileInput.files[0]);
+        });
+    }
+
+    // ---- Init ----
+    function init() {
+        initTabs();
+        initDropZone('drop-zone-excel', 'file-excel', handleExcel);
+        initDropZone('drop-zone-csv', 'file-csv', handleCSV);
+
+        document.getElementById('btn-parse-json').addEventListener('click', parseJSON);
+        document.getElementById('btn-json-template').addEventListener('click', copyJsonTemplate);
+        document.getElementById('btn-parse-text').addEventListener('click', parseText);
+        document.getElementById('btn-import-execute').addEventListener('click', executeImport);
+        document.getElementById('btn-import-reset').addEventListener('click', () => {
+            document.getElementById('import-preview-section').style.display = 'none';
+            parsedHeaders = [];
+            parsedRows = [];
+            columnMapping = {};
+        });
+
+        // Import buttons
+        document.getElementById('btn-import-project').addEventListener('click', () => open('projects'));
+        document.getElementById('btn-import-member').addEventListener('click', () => open('members'));
+    }
+
+    return { init, open };
+})();
+
+// Init on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    ImportModule.init();
+});
+
