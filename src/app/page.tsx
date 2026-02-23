@@ -330,6 +330,10 @@ function App() {
           matchings={store.matchings}
           notes={store.notes}
           onClose={() => setProjectDetailId(null)}
+          onEdit={() => {
+            const p = store.projects.find(x => x.id === projectDetailId);
+            if (p) { setProjectDetailId(null); handleEditProject(p); }
+          }}
           onAddNote={store.addNote}
           onDeleteNote={store.deleteNote}
         />
@@ -341,6 +345,10 @@ function App() {
           matchings={store.matchings}
           notes={store.notes}
           onClose={() => setMemberDetailId(null)}
+          onEdit={() => {
+            const m = store.members.find(x => x.id === memberDetailId);
+            if (m) { setMemberDetailId(null); handleEditMember(m); }
+          }}
           onAddNote={store.addNote}
           onDeleteNote={store.deleteNote}
         />

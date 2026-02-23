@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FaTimes, FaBriefcase, FaUsers, FaStickyNote } from 'react-icons/fa';
+import { FaTimes, FaBriefcase, FaUsers, FaStickyNote, FaEdit } from 'react-icons/fa';
 import { Project, Member, Matching, Note } from '../../lib/types';
 import { truncate, getMatchingBadgeClass, getProcessBadgeClass } from '../../lib/helpers';
 
@@ -77,11 +77,12 @@ interface ProjectDetailProps {
   matchings: Matching[];
   notes: Note[];
   onClose: () => void;
+  onEdit: () => void;
   onAddNote: (targetTable: string, targetId: string, content: string) => void;
   onDeleteNote: (id: string) => void;
 }
 
-export function ProjectDetailModal({ project, members, matchings, notes, onClose, onAddNote, onDeleteNote }: ProjectDetailProps) {
+export function ProjectDetailModal({ project, members, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote }: ProjectDetailProps) {
   if (!project) return null;
   const relatedMatchings = matchings.filter(mt => mt.project_id === project.id);
 
@@ -90,7 +91,12 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
       <div className="modal modal-lg">
         <div className="modal-header">
           <h2>{project.project_name_rewrite || project.project_name_original || '案件詳細'}</h2>
-          <button className="modal-close" onClick={onClose}><FaTimes /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-sm btn-secondary" onClick={onEdit} title="編集">
+              <FaEdit style={{ marginRight: 4 }} />編集
+            </button>
+            <button className="modal-close" onClick={onClose}><FaTimes /></button>
+          </div>
         </div>
         <div className="modal-body">
           <div className="detail-section">
@@ -200,11 +206,12 @@ interface MemberDetailProps {
   matchings: Matching[];
   notes: Note[];
   onClose: () => void;
+  onEdit: () => void;
   onAddNote: (targetTable: string, targetId: string, content: string) => void;
   onDeleteNote: (id: string) => void;
 }
 
-export function MemberDetailModal({ member, projects, matchings, notes, onClose, onAddNote, onDeleteNote }: MemberDetailProps) {
+export function MemberDetailModal({ member, projects, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote }: MemberDetailProps) {
   if (!member) return null;
   const relatedMatchings = matchings.filter(mt => mt.member_id === member.id);
 
@@ -213,7 +220,12 @@ export function MemberDetailModal({ member, projects, matchings, notes, onClose,
       <div className="modal modal-lg">
         <div className="modal-header">
           <h2>{member.full_name || member.initial || '要員詳細'}</h2>
-          <button className="modal-close" onClick={onClose}><FaTimes /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-sm btn-secondary" onClick={onEdit} title="編集">
+              <FaEdit style={{ marginRight: 4 }} />編集
+            </button>
+            <button className="modal-close" onClick={onClose}><FaTimes /></button>
+          </div>
         </div>
         <div className="modal-body">
           <div className="detail-section">
