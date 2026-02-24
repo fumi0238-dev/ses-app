@@ -11,7 +11,7 @@
  */
 
 import { execSync } from 'child_process';
-import { cpSync, existsSync, rmSync, unlinkSync, readFileSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, rmSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -80,7 +80,18 @@ console.log('========================================');
 
 const electronStandalone = path.join(root, 'electron', 'standalone');
 if (existsSync(electronStandalone)) {
-  rmSync(electronStandalone, { recursive: true });
+  try {
+    rmSync(electronStandalone, { recursive: true });
+  } catch (err) {
+    if (err.code === 'EPERM') {
+      // Windows でプロセスが CWD としてディレクトリを保持している場合 EPERM になる
+      // cmd.exe の rd コマンドはより強制的に削除できる
+      console.log('  rmSync EPERM: cmd rd にフォールバック...');
+      run(`cmd /c rd /s /q "${electronStandalone}"`, { env: process.env });
+    } else {
+      throw err;
+    }
+  }
 }
 cpSync(standalonePath, electronStandalone, { recursive: true });
 console.log('  .next/standalone -> electron/standalone');
@@ -132,28 +143,53 @@ console.log('========================================');
 const electronVersion = getElectronVersion();
 console.log(`  Electron バージョン: ${electronVersion}`);
 
-// ローカルの electron-rebuild を使い、バージョンを明示指定
-const rebuildBin = path.join(localBin, 'electron-rebuild');
-try {
-  run(`"${rebuildBin}" --force --electron-version ${electronVersion} --module-dir "${electronStandalone}" -w better-sqlite3`);
-  console.log('  better-sqlite3 を Electron 用にリビルドしました');
-} catch (err) {
-  console.error('WARNING: Rebuild in standalone failed. Trying alternative...');
-  try {
-    // ルートの node_modules でリビルドしてコピー
-    run(`"${rebuildBin}" --force --electron-version ${electronVersion} -w better-sqlite3`);
-    const srcBinding = path.join(root, 'node_modules', 'better-sqlite3');
-    const destBinding = path.join(electronStandalone, 'node_modules', 'better-sqlite3');
-    if (existsSync(destBinding)) {
-      rmSync(destBinding, { recursive: true });
-    }
-    cpSync(srcBinding, destBinding, { recursive: true });
-    console.log('  better-sqlite3 をコピーしました');
-  } catch (err2) {
-    console.error('ERROR: Native module rebuild failed:', err2.message);
-    process.exit(1);
-  }
+// EPERM 回避策:
+// Claude Code / Prisma が root の better_sqlite3.node をロック中のため
+// root node_modules には触れず、一時ディレクトリで prebuild-install を実行する。
+// better-sqlite3 v12.6.2 + Electron 34.x には win32-x64 のプリビルドバイナリが存在するため
+// VS Build Tools なしでダウンロードのみで対応可能。
+
+const tempPrebuildDir = path.join(root, '.build-temp', 'prebuild-test');
+const tempSqliteDir = path.join(tempPrebuildDir, 'better-sqlite3');
+
+if (existsSync(tempPrebuildDir)) {
+  rmSync(tempPrebuildDir, { recursive: true });
 }
+
+// prebuild-install が必要とする最低限のファイルを用意
+mkdirSync(path.join(tempSqliteDir, 'build', 'Release'), { recursive: true });
+cpSync(
+  path.join(root, 'node_modules', 'better-sqlite3', 'package.json'),
+  path.join(tempSqliteDir, 'package.json')
+);
+
+// 一時ディレクトリで prebuild-install を実行
+// → Electron 向けプリビルドバイナリをダウンロード（コンパイル不要）
+run(
+  `prebuild-install --runtime electron --target ${electronVersion} --arch x64`,
+  { cwd: tempSqliteDir }
+);
+
+const downloadedBinary = path.join(tempSqliteDir, 'build', 'Release', 'better_sqlite3.node');
+if (!existsSync(downloadedBinary)) {
+  console.error('ERROR: prebuild-install がバイナリをダウンロードできませんでした');
+  rmSync(tempPrebuildDir, { recursive: true });
+  process.exit(1);
+}
+
+// ダウンロードしたバイナリを electron/standalone にコピー
+const destBinaryDir = path.join(electronStandalone, 'node_modules', 'better-sqlite3', 'build', 'Release');
+const destBinary = path.join(destBinaryDir, 'better_sqlite3.node');
+
+if (!existsSync(destBinaryDir)) {
+  mkdirSync(destBinaryDir, { recursive: true });
+}
+
+cpSync(downloadedBinary, destBinary);
+console.log('  Electron 用バイナリを取得・コピーしました');
+
+// 一時ディレクトリを削除
+rmSync(tempPrebuildDir, { recursive: true });
 
 // ── Step 6: electron-builder でパッケージング ──
 console.log('\n========================================');
