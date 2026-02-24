@@ -11,7 +11,7 @@
  */
 
 import { execSync } from 'child_process';
-import { cpSync, existsSync, rmSync, unlinkSync } from 'fs';
+import { cpSync, existsSync, rmSync, unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,16 +19,34 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.join(__dirname, '..');
 
+// ローカルの node_modules/.bin を使うようにPATHを設定
+const localBin = path.join(root, 'node_modules', '.bin');
+const env = {
+  ...process.env,
+  PATH: `${localBin}${path.delimiter}${process.env.PATH}`,
+};
+
 function run(cmd, opts = {}) {
   console.log(`\n> ${cmd}\n`);
-  execSync(cmd, { stdio: 'inherit', cwd: root, ...opts });
+  execSync(cmd, { stdio: 'inherit', cwd: root, env, ...opts });
+}
+
+// インストール済み Electron のバージョンを取得
+function getElectronVersion() {
+  const pkgPath = path.join(root, 'node_modules', 'electron', 'package.json');
+  if (!existsSync(pkgPath)) {
+    console.error('ERROR: electron が node_modules に見つかりません。npm install を先に実行してください。');
+    process.exit(1);
+  }
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  return pkg.version;
 }
 
 // ── Step 1: Next.js ビルド ──
 console.log('========================================');
 console.log('Step 1/6: Next.js ビルド');
 console.log('========================================');
-run('npx next build --webpack');
+run('next build --webpack');
 
 const standalonePath = path.join(root, '.next', 'standalone');
 if (!existsSync(standalonePath)) {
@@ -78,7 +96,7 @@ if (existsSync(templatePath)) {
 }
 
 try {
-  run('npx prisma db push --accept-data-loss', {
+  run('prisma db push --accept-data-loss', {
     env: {
       ...process.env,
       DATABASE_URL: `file:${templatePath}`,
@@ -111,13 +129,19 @@ console.log('\n========================================');
 console.log('Step 5/6: ネイティブモジュールのリビルド');
 console.log('========================================');
 
+const electronVersion = getElectronVersion();
+console.log(`  Electron バージョン: ${electronVersion}`);
+
+// ローカルの electron-rebuild を使い、バージョンを明示指定
+const rebuildBin = path.join(localBin, 'electron-rebuild');
 try {
-  run(`npx @electron/rebuild --force --module-dir "${electronStandalone}" -w better-sqlite3`);
+  run(`"${rebuildBin}" --force --electron-version ${electronVersion} --module-dir "${electronStandalone}" -w better-sqlite3`);
   console.log('  better-sqlite3 を Electron 用にリビルドしました');
 } catch (err) {
   console.error('WARNING: Rebuild in standalone failed. Trying alternative...');
   try {
-    run('npx @electron/rebuild --force -w better-sqlite3');
+    // ルートの node_modules でリビルドしてコピー
+    run(`"${rebuildBin}" --force --electron-version ${electronVersion} -w better-sqlite3`);
     const srcBinding = path.join(root, 'node_modules', 'better-sqlite3');
     const destBinding = path.join(electronStandalone, 'node_modules', 'better-sqlite3');
     if (existsSync(destBinding)) {
@@ -136,7 +160,7 @@ console.log('\n========================================');
 console.log('Step 6/6: Electron パッケージング');
 console.log('========================================');
 
-run('npx electron-builder --config electron-builder.json');
+run('electron-builder --config electron-builder.json');
 
 // Clean up electron/standalone (it's now packaged)
 if (existsSync(electronStandalone)) {
