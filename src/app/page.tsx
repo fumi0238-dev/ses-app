@@ -5,9 +5,10 @@ import {
   FaBolt, FaChartPie, FaBriefcase, FaUsers, FaHandshake, FaUser, FaBars,
   FaClipboardList,
 } from 'react-icons/fa';
+import { TbLayoutSidebarLeftCollapse, TbLayoutSidebarLeftExpand } from 'react-icons/tb';
 
 import { StoreProvider, useStore } from '../lib/store';
-import { Project, Member, Matching, PageName, MatchingStatus } from '../lib/types';
+import { Project, Member, Matching, PageName, MatchingStatus, MemberProcess } from '../lib/types';
 import { formatDate, formatDateForFile, getDefaultTasksForStatus } from '../lib/helpers';
 
 import Toast from '../components/Toast';
@@ -28,6 +29,7 @@ function App() {
   const store = useStore();
   const [currentPage, setCurrentPage] = useState<PageName>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   // Modal states
@@ -102,6 +104,12 @@ function App() {
       showToast('要員を追加しました');
     }
     setMemberFormData(null);
+  };
+  const handleMemberProcessChange = async (id: string, process: MemberProcess) => {
+    await store.updateMember(id, { process });
+    const m = store.members.find(x => x.id === id);
+    store.logActivity('プロセス変更', 'members', id, m?.full_name || m?.initial || '', process);
+    showToast(`プロセスを「${process}」に変更しました`);
   };
 
   // ---- Matching handlers ----
@@ -203,11 +211,18 @@ function App() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
       {/* Sidebar */}
-      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="sidebar-header">
+          <button
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarCollapsed(c => !c)}
+            title={sidebarCollapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ'}
+          >
+            {sidebarCollapsed ? <TbLayoutSidebarLeftExpand /> : <TbLayoutSidebarLeftCollapse />}
+          </button>
           <div className="logo">
             <FaBolt style={{ color: '#fbbf24', fontSize: 24 }} />
-            <span>ReForce SES</span>
+            <span className="sidebar-label">ReForce SES</span>
           </div>
         </div>
         <nav className="sidebar-nav">
@@ -222,16 +237,17 @@ function App() {
               key={page}
               className={`nav-item${currentPage === page ? ' active' : ''}`}
               onClick={() => navigate(page)}
+              title={sidebarCollapsed ? label : undefined}
             >
               <Icon style={{ fontSize: 16 }} />
-              <span>{label}</span>
+              <span className="sidebar-label">{label}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar"><FaUser /></div>
-            <div className="user-detail">
+            <div className="user-detail sidebar-label">
               <span className="user-name">増井</span>
               <span className="user-role">Sales Manager</span>
             </div>
@@ -240,7 +256,7 @@ function App() {
       </aside>
 
       {/* Main content */}
-      <main className="main-content">
+      <main className={`main-content${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
         {/* Header */}
         <header className="header">
           <button className="menu-toggle" onClick={() => setSidebarOpen(o => !o)}>
@@ -285,6 +301,7 @@ function App() {
             onEdit={handleEditMember}
             onDelete={handleDeleteMember}
             onDetail={id => setMemberDetailId(id)}
+            onProcessChange={handleMemberProcessChange}
             onImport={() => setImportTarget('members')}
             onExport={() => handleExport('members')}
           />

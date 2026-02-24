@@ -6,7 +6,7 @@ import {
   FaEdit, FaTrash, FaYenSign, FaMapMarkerAlt,
   FaCalendar, FaUserTie, FaBriefcase,
 } from 'react-icons/fa';
-import { Member, Matching, Project } from '../lib/types';
+import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess } from '../lib/types';
 import { truncate, getProcessBadgeClass, getMatchingBadgeClass } from '../lib/helpers';
 
 interface Props {
@@ -17,13 +17,14 @@ interface Props {
   onEdit: (m: Member) => void;
   onDelete: (id: string) => void;
   onDetail: (id: string) => void;
+  onProcessChange: (id: string, process: MemberProcess) => void;
   onImport: () => void;
   onExport: () => void;
 }
 
 export default function Members({
   members, matchings, projects,
-  onAdd, onEdit, onDelete, onDetail, onImport, onExport,
+  onAdd, onEdit, onDelete, onDetail, onProcessChange, onImport, onExport,
 }: Props) {
   const [search, setSearch] = useState('');
   const [filterProcess, setFilterProcess] = useState('');
@@ -129,7 +130,19 @@ export default function Members({
                     <div className="member-name">{m.full_name || m.initial}</div>
                     <div className="member-initial">{m.initial} | {m.affiliation || '-'}</div>
                   </div>
-                  <span className={`badge ${getProcessBadgeClass(m.process)}`}>{m.process}</span>
+                  <select
+                    className={`badge process-select ${getProcessBadgeClass(m.process)}`}
+                    value={m.process}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => {
+                      e.stopPropagation();
+                      onProcessChange(m.id, e.target.value as MemberProcess);
+                    }}
+                  >
+                    {MEMBER_PROCESSES.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="member-meta">
