@@ -1,0 +1,40 @@
+{
+  "appId": "com.ses-app.matching-tool",
+  "productName": "SES案件マッチング管理ツール",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "electron/**/*",
+    "!electron/standalone/node_modules/.package-lock.json"
+  ],
+  "extraResources": [
+    {
+      "from": "template.db",
+      "to": "template.db"
+    }
+  ],
+  "asar": false,
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "shortcutName": "SES管理ツール"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ]
+  }
+}

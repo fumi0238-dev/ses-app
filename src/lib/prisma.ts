@@ -13,7 +13,7 @@ declare global {
 }
 
 function createClient(): PrismaClient {
-  const dbPath = path.join(process.cwd(), 'dev.db');
+  const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'dev.db');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const adapter = new PrismaBetterSqlite3({ url: dbPath } as any);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

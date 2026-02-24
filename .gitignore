@@ -45,3 +45,7 @@ next-env.d.ts
 # prisma db
 *.db
 *.db-journal
+
+# electron
+/dist-electron/
+/electron/standalone/
