@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { FaBriefcase, FaUsers, FaHandshake, FaCheckCircle, FaClock, FaChartBar, FaChartPie, FaStream } from 'react-icons/fa';
+import { FaBriefcase, FaUsers, FaHandshake, FaCheckCircle, FaClock, FaChartBar, FaChartPie, FaStream, FaInbox } from 'react-icons/fa';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Project, Member, Matching, ActivityLog } from '../lib/types';
@@ -100,7 +100,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
           <div className="card-body">
             <div className="recent-list">
               {recentProjects.length === 0
-                ? <div className="empty-state"><p>案件データなし</p></div>
+                ? <div className="empty-state"><div className="empty-state-icon"><FaInbox /></div><p>案件データがありません</p></div>
                 : recentProjects.map(p => (
                   <div key={p.id} className="recent-item" onClick={() => onShowProject(p.id)}>
                     <span className="recent-item-name">{truncate(p.project_name_rewrite || p.project_name_original, 40)}</span>
@@ -118,7 +118,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
           <div className="card-body">
             <div className="recent-list">
               {searchingMembers.length === 0
-                ? <div className="empty-state"><p>検索中の要員なし</p></div>
+                ? <div className="empty-state"><div className="empty-state-icon"><FaUsers /></div><p>検索中の要員がいません</p></div>
                 : searchingMembers.map(m => (
                   <div key={m.id} className="recent-item" onClick={() => onShowMember(m.id)}>
                     <span className="recent-item-name">{m.full_name || m.initial} - {m.desired_position || '-'}</span>
@@ -146,7 +146,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
             <div style={{ height: 250 }}>
               {Object.keys(matchStatusCounts).length > 0
                 ? <Doughnut data={doughnutData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 12 } } } } }} />
-                : <div className="empty-state"><p>マッチングデータなし</p></div>
+                : <div className="empty-state"><div className="empty-state-icon"><FaHandshake /></div><p>マッチングデータがありません</p></div>
               }
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
         <div className="card-body">
           <div className="recent-list">
             {activityLogs.length === 0
-              ? <div className="empty-state"><p>アクティビティなし</p></div>
+              ? <div className="empty-state"><div className="empty-state-icon"><FaStream /></div><p>アクティビティがありません</p></div>
               : activityLogs.slice(0, 20).map(log => (
                 <div key={log.id} className="recent-item" style={{ cursor: 'default' }}>
                   <span className="recent-item-name">

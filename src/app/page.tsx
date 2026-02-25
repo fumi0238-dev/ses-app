@@ -268,8 +268,21 @@ function App() {
           </div>
         </header>
 
+        {/* Loading skeleton */}
+        {store.loading && (
+          <div className="loading-page">
+            <div className="stats-grid">
+              {[1,2,3,4].map(i => <div key={i} className="skeleton skeleton-stat" />)}
+            </div>
+            <div className="dashboard-grid">
+              <div className="skeleton" style={{ height: 240 }} />
+              <div className="skeleton" style={{ height: 240 }} />
+            </div>
+          </div>
+        )}
+
         {/* Pages */}
-        {currentPage === 'dashboard' && (
+        {!store.loading && currentPage === 'dashboard' && (
           <Dashboard
             projects={store.projects}
             members={store.members}
@@ -279,7 +292,7 @@ function App() {
             onShowMember={id => setMemberDetailId(id)}
           />
         )}
-        {currentPage === 'projects' && (
+        {!store.loading && currentPage === 'projects' && (
           <Projects
             projects={store.projects}
             matchings={store.matchings}
@@ -292,7 +305,7 @@ function App() {
             onBulkUpdate={handleBulkUpdateProjects}
           />
         )}
-        {currentPage === 'members' && (
+        {!store.loading && currentPage === 'members' && (
           <Members
             members={store.members}
             matchings={store.matchings}
@@ -306,7 +319,7 @@ function App() {
             onExport={() => handleExport('members')}
           />
         )}
-        {currentPage === 'matching' && (
+        {!store.loading && currentPage === 'matching' && (
           <MatchingPage
             projects={store.projects}
             members={store.members}
@@ -319,7 +332,7 @@ function App() {
             onShowMember={id => setMemberDetailId(id)}
           />
         )}
-        {currentPage === 'progress' && (
+        {!store.loading && currentPage === 'progress' && (
           <ProgressPage
             projects={store.projects}
             members={store.members}

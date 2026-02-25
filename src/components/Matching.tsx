@@ -134,11 +134,14 @@ export default function MatchingPage({
           <div className="panel-body">
             {!hasMatched ? (
               <div className="empty-state">
-                <FaMagic style={{ fontSize: 48, marginBottom: 12, opacity: 0.3, display: 'block' }} />
-                <p>案件を選択して「マッチング実行」を押してください</p>
+                <div className="empty-state-icon"><FaMagic /></div>
+                <h3>マッチング待ち</h3>
+                <p>左のパネルから案件を選択して「マッチング実行」を押してください</p>
               </div>
             ) : matchResults.length === 0 ? (
               <div className="empty-state">
+                <div className="empty-state-icon"><FaUsers /></div>
+                <h3>該当者なし</h3>
                 <p>マッチする要員が見つかりませんでした</p>
               </div>
             ) : (
@@ -245,7 +248,7 @@ export default function MatchingPage({
             </thead>
             <tbody>
               {matchings.length === 0 ? (
-                <tr><td colSpan={7} className="empty-state"><p>マッチング履歴なし</p></td></tr>
+                <tr><td colSpan={7} className="empty-state"><h3>マッチング履歴がありません</h3><p>マッチング実行後に結果が表示されます</p></td></tr>
               ) : matchings.map(mt => {
                 const p = projects.find(x => x.id === mt.project_id);
                 const m = members.find(x => x.id === mt.member_id);

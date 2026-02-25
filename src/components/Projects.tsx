@@ -185,7 +185,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={12} className="empty-state"><p>該当する案件がありません</p></td></tr>
+              <tr><td colSpan={12} className="empty-state"><h3>該当する案件がありません</h3><p>検索条件を変更するか、新しい案件を追加してください</p></td></tr>
             ) : filtered.map(p => {
               const matchCount = matchings.filter(mt => mt.project_id === p.id).length;
               return (

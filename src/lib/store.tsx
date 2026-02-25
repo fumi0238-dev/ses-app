@@ -5,6 +5,7 @@ import { Project, Member, Matching, ActivityLog, Note, Task } from './types';
 import { getCurrentTimestamp } from './helpers';
 
 interface StoreContextType {
+  loading: boolean;
   projects: Project[];
   members: Member[];
   matchings: Matching[];
@@ -41,6 +42,7 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [matchings, setMatchings] = useState<Matching[]>([]);
@@ -67,6 +69,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setTasks(tk);
       } catch (e) {
         console.error('Failed to load initial data:', e);
+      } finally {
+        setLoading(false);
       }
     };
     load();
@@ -295,7 +299,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      projects, members, matchings, activityLogs, notes, tasks,
+      loading, projects, members, matchings, activityLogs, notes, tasks,
       addProject, updateProject, deleteProject, bulkUpdateProjects,
       addMember, updateMember, deleteMember,
       addMatching, updateMatching, deleteMatching,

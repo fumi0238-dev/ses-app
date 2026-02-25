@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   FaSearch, FaPlus, FaFileImport, FaFileExport,
   FaEdit, FaTrash, FaYenSign, FaMapMarkerAlt,
-  FaCalendar, FaUserTie, FaBriefcase,
+  FaCalendar, FaUserTie, FaBriefcase, FaUsers,
 } from 'react-icons/fa';
 import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess } from '../lib/types';
 import { truncate, getProcessBadgeClass, getMatchingBadgeClass } from '../lib/helpers';
@@ -99,7 +99,9 @@ export default function Members({
 
       {filtered.length === 0 ? (
         <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-          <p>該当する要員がいません</p>
+          <div className="empty-state-icon"><FaUsers style={{ fontSize: 32, color: '#cbd5e1' }} /></div>
+          <h3>該当する要員がいません</h3>
+          <p>検索条件を変更するか、新しい要員を追加してください</p>
         </div>
       ) : (
         <div className="members-grid">
