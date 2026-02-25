@@ -15,6 +15,7 @@ interface Props {
   onImport: () => void;
   onExport: () => void;
   onBulkUpdate: (ids: string[], updates: Partial<Project>) => void;
+  onBulkDelete: (ids: string[]) => void;
 }
 
 type SortField = 'status' | 'added_date' | 'project_name' | 'purchase_price_num' | 'match_count';
@@ -27,7 +28,7 @@ function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: 
     : <FaSortDown className="sort-icon" style={{ opacity: 1, color: 'var(--primary)' }} />;
 }
 
-export default function Projects({ projects, matchings, onAdd, onEdit, onDelete, onDetail, onImport, onExport, onBulkUpdate }: Props) {
+export default function Projects({ projects, matchings, onAdd, onEdit, onDelete, onDetail, onImport, onExport, onBulkUpdate, onBulkDelete }: Props) {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterShareable, setFilterShareable] = useState('');
@@ -111,6 +112,13 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
     setBulkShareable('');
   };
 
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}件の案件を削除しますか？この操作は取り消せません。`)) return;
+    onBulkDelete([...selectedIds]);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="page">
       <div className="page-actions">
@@ -159,6 +167,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
             {SHAREABLE_VALUES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button className="btn btn-sm btn-primary" onClick={handleBulkApply}><FaCheck /> 適用</button>
+          <button className="btn btn-sm btn-danger" onClick={handleBulkDelete}><FaTrash /> 削除</button>
           <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())}><FaTimes /> 解除</button>
         </div>
       )}

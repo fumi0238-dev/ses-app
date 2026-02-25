@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import {
   FaSearch, FaPlus, FaFileImport, FaFileExport,
   FaEdit, FaTrash, FaYenSign, FaMapMarkerAlt,
-  FaCalendar, FaUserTie, FaBriefcase, FaUsers,
+  FaCalendar, FaUserTie, FaBriefcase, FaUsers, FaTimes,
 } from 'react-icons/fa';
 import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess } from '../lib/types';
 import { truncate, getProcessBadgeClass, getMatchingBadgeClass } from '../lib/helpers';
@@ -20,16 +20,18 @@ interface Props {
   onProcessChange: (id: string, process: MemberProcess) => void;
   onImport: () => void;
   onExport: () => void;
+  onBulkDelete: (ids: string[]) => void;
 }
 
 export default function Members({
   members, matchings, projects,
-  onAdd, onEdit, onDelete, onDetail, onProcessChange, onImport, onExport,
+  onAdd, onEdit, onDelete, onDetail, onProcessChange, onImport, onExport, onBulkDelete,
 }: Props) {
   const [search, setSearch] = useState('');
   const [filterProcess, setFilterProcess] = useState('');
   const [filterWorkPref, setFilterWorkPref] = useState('');
   const [filterAvailability, setFilterAvailability] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 動的にフィルタ選択肢を生成
   const processOptions = useMemo(() => [...new Set(members.map(m => m.process).filter(Boolean))].sort(), [members]);
@@ -65,6 +67,26 @@ export default function Members({
     return list;
   }, [members, search, filterProcess, filterWorkPref, filterAvailability]);
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(filtered.map(m => m.id)) : new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}件の要員を削除しますか？この操作は取り消せません。`)) return;
+    onBulkDelete([...selectedIds]);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="page">
       <div className="page-actions">
@@ -97,6 +119,27 @@ export default function Members({
         <button className="btn btn-secondary" onClick={onExport}><FaFileExport /> エクスポート</button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-count">{selectedIds.size}件選択中</span>
+          <button className="btn btn-sm btn-danger" onClick={handleBulkDelete}><FaTrash /> 削除</button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())}><FaTimes /> 解除</button>
+        </div>
+      )}
+
+      {filtered.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <label style={{ fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+              onChange={e => toggleAll(e.target.checked)}
+            />
+            すべて選択
+          </label>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <div className="empty-state" style={{ gridColumn: '1/-1' }}>
           <div className="empty-state-icon"><FaUsers style={{ fontSize: 32, color: '#cbd5e1' }} /></div>
@@ -127,10 +170,13 @@ export default function Members({
                 className="member-card"
                 onClick={() => onDetail(m.id)}
               >
-                <div className="member-card-header">
-                  <div>
-                    <div className="member-name">{m.full_name || m.initial}</div>
-                    <div className="member-initial">{m.initial} | {m.affiliation || '-'}</div>
+                <div className="member-card-toprow">
+                  <div className="member-card-check" onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(m.id)}
+                      onChange={() => toggleSelect(m.id)}
+                    />
                   </div>
                   <select
                     className={`badge process-select ${getProcessBadgeClass(m.process)}`}
@@ -145,6 +191,12 @@ export default function Members({
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
+                </div>
+                <div className="member-card-header">
+                  <div>
+                    <div className="member-name">{m.full_name || m.initial}</div>
+                    <div className="member-initial">{m.initial} | {m.affiliation || '-'}</div>
+                  </div>
                 </div>
 
                 <div className="member-meta">

@@ -17,14 +17,17 @@ interface StoreContextType {
   updateProject: (id: string, data: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   bulkUpdateProjects: (ids: string[], updates: Partial<Project>) => Promise<void>;
+  bulkDeleteProjects: (ids: string[]) => Promise<void>;
 
   addMember: (data: Omit<Member, 'id'>) => Promise<Member>;
   updateMember: (id: string, data: Partial<Member>) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
+  bulkDeleteMembers: (ids: string[]) => Promise<void>;
 
   addMatching: (data: Omit<Matching, 'id'>) => Promise<Matching>;
   updateMatching: (id: string, data: Partial<Matching>) => Promise<void>;
   deleteMatching: (id: string) => Promise<void>;
+  bulkDeleteMatchings: (ids: string[]) => Promise<void>;
 
   addTask: (matchingId: string, content: string, dueDate?: string) => Promise<Task>;
   updateTask: (id: string, data: Partial<Task>) => Promise<void>;
@@ -116,6 +119,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProjects(prev => prev.map(p => ids.includes(p.id) ? { ...p, ...updates } : p));
   }, []);
 
+  const bulkDeleteProjects = useCallback(async (ids: string[]): Promise<void> => {
+    const res = await fetch('/api/projects/bulk', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to bulk delete projects');
+    setProjects(prev => prev.filter(p => !ids.includes(p.id)));
+  }, []);
+
   // Members
   const addMember = useCallback(async (data: Omit<Member, 'id'>): Promise<Member> => {
     const res = await fetch('/api/members', {
@@ -146,6 +159,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setMembers(prev => prev.filter(m => m.id !== id));
   }, []);
 
+  const bulkDeleteMembers = useCallback(async (ids: string[]): Promise<void> => {
+    const res = await fetch('/api/members/bulk', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to bulk delete members');
+    setMembers(prev => prev.filter(m => !ids.includes(m.id)));
+  }, []);
+
   // Matchings
   const addMatching = useCallback(async (data: Omit<Matching, 'id'>): Promise<Matching> => {
     const res = await fetch('/api/matchings', {
@@ -174,6 +197,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const res = await fetch(`/api/matchings/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete matching');
     setMatchings(prev => prev.filter(mt => mt.id !== id));
+  }, []);
+
+  const bulkDeleteMatchings = useCallback(async (ids: string[]): Promise<void> => {
+    const res = await fetch('/api/matchings/bulk', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new Error('Failed to bulk delete matchings');
+    setMatchings(prev => prev.filter(mt => !ids.includes(mt.id)));
   }, []);
 
   // Notes
@@ -300,9 +333,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <StoreContext.Provider value={{
       loading, projects, members, matchings, activityLogs, notes, tasks,
-      addProject, updateProject, deleteProject, bulkUpdateProjects,
-      addMember, updateMember, deleteMember,
-      addMatching, updateMatching, deleteMatching,
+      addProject, updateProject, deleteProject, bulkUpdateProjects, bulkDeleteProjects,
+      addMember, updateMember, deleteMember, bulkDeleteMembers,
+      addMatching, updateMatching, deleteMatching, bulkDeleteMatchings,
       addTask, updateTask, deleteTask, bulkAddTasks,
       addNote, deleteNote,
       logActivity,

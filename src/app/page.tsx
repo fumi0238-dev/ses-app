@@ -83,6 +83,11 @@ function App() {
     store.logActivity('一括更新', 'projects', '', `${ids.length}件`, '');
     showToast(`${ids.length}件を更新しました`);
   };
+  const handleBulkDeleteProjects = async (ids: string[]) => {
+    await store.bulkDeleteProjects(ids);
+    store.logActivity('一括削除', 'projects', '', `${ids.length}件`, '');
+    showToast(`${ids.length}件の案件を削除しました`);
+  };
 
   // ---- Member handlers ----
   const handleAddMember = () => setMemberFormData({});
@@ -105,6 +110,11 @@ function App() {
     }
     setMemberFormData(null);
   };
+  const handleBulkDeleteMembers = async (ids: string[]) => {
+    await store.bulkDeleteMembers(ids);
+    store.logActivity('一括削除', 'members', '', `${ids.length}件`, '');
+    showToast(`${ids.length}件の要員を削除しました`);
+  };
   const handleMemberProcessChange = async (id: string, process: MemberProcess) => {
     await store.updateMember(id, { process });
     const m = store.members.find(x => x.id === id);
@@ -124,6 +134,11 @@ function App() {
     await store.deleteMatching(id);
     store.logActivity('マッチング削除', 'matchings', id, '', '');
     showToast('マッチングを削除しました');
+  };
+  const handleBulkDeleteMatchings = async (ids: string[]) => {
+    await store.bulkDeleteMatchings(ids);
+    store.logActivity('一括削除', 'matchings', '', `${ids.length}件`, '');
+    showToast(`${ids.length}件のマッチングを削除しました`);
   };
   const handleSaveMatching = async (data: Omit<Matching, 'id'>, id?: string) => {
     if (id) {
@@ -303,6 +318,7 @@ function App() {
             onImport={() => setImportTarget('projects')}
             onExport={() => handleExport('projects')}
             onBulkUpdate={handleBulkUpdateProjects}
+            onBulkDelete={handleBulkDeleteProjects}
           />
         )}
         {!store.loading && currentPage === 'members' && (
@@ -317,6 +333,7 @@ function App() {
             onProcessChange={handleMemberProcessChange}
             onImport={() => setImportTarget('members')}
             onExport={() => handleExport('members')}
+            onBulkDelete={handleBulkDeleteMembers}
           />
         )}
         {!store.loading && currentPage === 'matching' && (
@@ -341,6 +358,7 @@ function App() {
             onQuickStatusUpdate={handleQuickStatusUpdate}
             onEditMatching={handleEditMatching}
             onDeleteMatching={handleDeleteMatching}
+            onBulkDeleteMatchings={handleBulkDeleteMatchings}
             onUpdateMatchingField={handleUpdateMatchingField}
             onShowProject={id => setProjectDetailId(id)}
             onShowMember={id => setMemberDetailId(id)}

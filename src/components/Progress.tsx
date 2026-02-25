@@ -16,6 +16,7 @@ interface Props {
   onQuickStatusUpdate: (id: string, status: string) => void;
   onEditMatching: (mt: Matching) => void;
   onDeleteMatching: (id: string) => void;
+  onBulkDeleteMatchings: (ids: string[]) => void;
   onUpdateMatchingField: (id: string, data: Partial<Matching>) => Promise<void>;
   onShowProject: (id: string) => void;
   onShowMember: (id: string) => void;
@@ -274,7 +275,7 @@ function TaskChecklist({
 /* -------- Main ProgressPage -------- */
 export default function ProgressPage({
   projects, members, matchings, tasks,
-  onQuickStatusUpdate, onEditMatching, onDeleteMatching, onUpdateMatchingField, onShowProject, onShowMember,
+  onQuickStatusUpdate, onEditMatching, onDeleteMatching, onBulkDeleteMatchings, onUpdateMatchingField, onShowProject, onShowMember,
   onAddTask, onUpdateTask, onDeleteTask, onBulkAddTasks,
 }: Props) {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -288,6 +289,9 @@ export default function ProgressPage({
   // Inline memo editing
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [editingMemoText, setEditingMemoText] = useState('');
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // D&D for kanban
   const [draggedMatchingId, setDraggedMatchingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<string | null>(null);
@@ -444,6 +448,26 @@ export default function ProgressPage({
     setter(allTasksExpanded ? new Set() : new Set(allFilteredIds));
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(filtered.map(item => item.matching.id)) : new Set());
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}件のマッチングを削除しますか？この操作は取り消せません。`)) return;
+    onBulkDeleteMatchings([...selectedIds]);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="page">
       {/* Filter bar */}
@@ -503,12 +527,24 @@ export default function ProgressPage({
         })}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-count">{selectedIds.size}件選択中</span>
+          <button className="btn btn-sm btn-danger" onClick={handleBulkDelete}><FaTrash /> 削除</button>
+          <button className="btn btn-sm btn-secondary" onClick={() => setSelectedIds(new Set())}><FaTimes /> 解除</button>
+        </div>
+      )}
+
       {/* Table View */}
       {viewMode === 'table' && (
         <div className="table-container">
           <table className="data-table">
             <thead>
               <tr>
+                <th className="th-check">
+                  <input type="checkbox" checked={selectedIds.size > 0 && selectedIds.size === filtered.length} onChange={e => toggleAll(e.target.checked)} />
+                </th>
                 <th>ステータス</th>
                 <th>案件名</th>
                 <th>職種</th>
@@ -527,10 +563,13 @@ export default function ProgressPage({
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={14} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>該当するマッチングがありません</td></tr>
+                <tr><td colSpan={15} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>該当するマッチングがありません</td></tr>
               ) : filtered.map(({ matching: mt, project, member, priceDiff, matchedSkills, skillMatchRate, matchingTasks }) => (
                 <React.Fragment key={mt.id}>
                   <tr>
+                    <td className="th-check">
+                      <input type="checkbox" checked={selectedIds.has(mt.id)} onChange={() => toggleSelect(mt.id)} />
+                    </td>
                     <td>
                       <select
                         className="inline-status-select"
@@ -656,7 +695,7 @@ export default function ProgressPage({
                   </tr>
                   {expandedTable.has(mt.id) && (
                     <tr className="task-expand-row">
-                      <td colSpan={14}>
+                      <td colSpan={15}>
                         <div className="task-expand-content">
                           <div className="task-expand-header">
                             <span>ネクストアクション</span>
