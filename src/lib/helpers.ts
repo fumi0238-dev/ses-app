@@ -1,4 +1,4 @@
-import { MemberProcess, MatchingStatus } from './types';
+import { MemberProcess, MatchingStatus, RequiredFieldDef } from './types';
 
 export function truncate(str: string | undefined | null, len: number): string {
   if (!str) return '-';
@@ -92,4 +92,16 @@ export function getDefaultTasksForStatus(status: MatchingStatus): string[] {
     '見送り': ['見送り理由の記録', '候補者への連絡'],
   };
   return map[status] || [];
+}
+
+export function getMissingFields<T>(
+  entity: T,
+  requiredFields: RequiredFieldDef<T>[]
+): string[] {
+  return requiredFields
+    .filter(f => {
+      const val = entity[f.key as keyof T];
+      return val === undefined || val === null || val === '';
+    })
+    .map(f => f.label);
 }

@@ -412,6 +412,76 @@ body {
 .badge-searching { background: #fef3c7; color: #92400e; }
 .badge-active { background: #d1fae5; color: #065f46; }
 
+/* ==================== Required Fields Reminder ==================== */
+.badge-missing {
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    cursor: help;
+    position: relative;
+    white-space: nowrap;
+}
+.badge-missing::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: pre-line;
+    line-height: 1.5;
+    min-width: 120px;
+    max-width: 200px;
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.badge-missing::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #1e293b;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    z-index: 50;
+}
+.badge-missing:hover::after,
+.badge-missing:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+tr.row-has-missing {
+    background: #fffbeb !important;
+}
+tr.row-has-missing:hover {
+    background: #fef3c7 !important;
+}
+.member-card.card-has-missing {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+.member-card.card-has-missing:hover {
+    border-color: #f59e0b;
+    background: #fef3c7;
+}
+
 /* Process Select (inline status change) */
 select.process-select {
     appearance: none;

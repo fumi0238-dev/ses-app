@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { FaSearch, FaPlus, FaFileImport, FaFileExport, FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaCheck, FaTimes } from 'react-icons/fa';
-import { Project, Matching, PROJECT_STATUSES, SHAREABLE_VALUES } from '../lib/types';
-import { truncate } from '../lib/helpers';
+import { Project, Matching, PROJECT_STATUSES, SHAREABLE_VALUES, PROJECT_REQUIRED_FIELDS } from '../lib/types';
+import { truncate, getMissingFields } from '../lib/helpers';
 
 interface Props {
   projects: Project[];
@@ -197,8 +197,10 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
               <tr><td colSpan={12} className="empty-state"><h3>該当する案件がありません</h3><p>検索条件を変更するか、新しい案件を追加してください</p></td></tr>
             ) : filtered.map(p => {
               const matchCount = matchings.filter(mt => mt.project_id === p.id).length;
+              const missingLabels = getMissingFields(p, PROJECT_REQUIRED_FIELDS);
+              const hasMissing = missingLabels.length > 0;
               return (
-                <tr key={p.id}>
+                <tr key={p.id} className={hasMissing ? 'row-has-missing' : undefined}>
                   <td className="th-check">
                     <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} />
                   </td>
@@ -209,6 +211,16 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                     <a href="#" style={{ color: 'var(--primary)', fontWeight: 500 }} onClick={e => { e.preventDefault(); onDetail(p.id); }}>
                       {truncate(p.project_name_rewrite || p.project_name_original, 30)}
                     </a>
+                    {hasMissing && (
+                      <span
+                        className="badge badge-missing"
+                        data-tooltip={`未入力: ${missingLabels.join(', ')}`}
+                        title={`未入力: ${missingLabels.join(', ')}`}
+                        style={{ marginLeft: 6 }}
+                      >
+                        未入力あり
+                      </span>
+                    )}
                   </td>
                   <td>{truncate(p.role, 20)}</td>
                   <td>{p.location || '-'}</td>

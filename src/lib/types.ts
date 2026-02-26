@@ -109,3 +109,31 @@ export interface Task {
 export const TASK_PROGRESS_STATUSES = ['未着手', '対応中', '完了'] as const;
 
 export type PageName = 'dashboard' | 'projects' | 'members' | 'matching' | 'progress';
+
+// --- Required Fields Config ---
+// 一覧で「未入力あり」バッジを表示するための必須項目定義。
+// TODO: 現在は仮設定。運用しながら必要な項目を追加・変更すること。
+//   追加例: { key: 'location', label: '勤務地' }
+//   ここを変更するだけで一覧の表示に自動反映される（他ファイルの修正不要）。
+export interface RequiredFieldDef<T> {
+  key: keyof T;
+  label: string;
+}
+
+export const PROJECT_REQUIRED_FIELDS: RequiredFieldDef<Project>[] = [
+  { key: 'project_name_original', label: '案件名' },
+  { key: 'role', label: '募集職種' },
+  // { key: 'location', label: '勤務地' },
+  // { key: 'purchase_price', label: '仕入単価' },
+  // { key: 'work_style', label: '働き方' },
+  // { key: 'required_skill_tags', label: '必須スキルタグ' },
+];
+
+export const MEMBER_REQUIRED_FIELDS: RequiredFieldDef<Member>[] = [
+  { key: 'full_name', label: '要員名' },
+  { key: 'affiliation', label: '所属先' },
+  // { key: 'desired_price', label: '希望単価' },
+  // { key: 'skill_tags', label: 'スキルタグ' },
+  // { key: 'available_date', label: '稼働可能日' },
+  // { key: 'nearest_station', label: '最寄駅' },
+];

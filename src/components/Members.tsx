@@ -6,8 +6,8 @@ import {
   FaEdit, FaTrash, FaYenSign, FaMapMarkerAlt,
   FaCalendar, FaUserTie, FaBriefcase, FaUsers, FaTimes,
 } from 'react-icons/fa';
-import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess } from '../lib/types';
-import { truncate, getProcessBadgeClass, getMatchingBadgeClass } from '../lib/helpers';
+import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess, MEMBER_REQUIRED_FIELDS } from '../lib/types';
+import { truncate, getProcessBadgeClass, getMatchingBadgeClass, getMissingFields } from '../lib/helpers';
 
 interface Props {
   members: Member[];
@@ -164,10 +164,13 @@ export default function Members({
               };
             });
 
+            const missingLabels = getMissingFields(m, MEMBER_REQUIRED_FIELDS);
+            const hasMissing = missingLabels.length > 0;
+
             return (
               <div
                 key={m.id}
-                className="member-card"
+                className={`member-card${hasMissing ? ' card-has-missing' : ''}`}
                 onClick={() => onDetail(m.id)}
               >
                 <div className="member-card-toprow">
@@ -194,7 +197,19 @@ export default function Members({
                 </div>
                 <div className="member-card-header">
                   <div>
-                    <div className="member-name">{m.full_name || m.initial}</div>
+                    <div className="member-name">
+                      {m.full_name || m.initial}
+                      {hasMissing && (
+                        <span
+                          className="badge badge-missing"
+                          data-tooltip={`未入力: ${missingLabels.join(', ')}`}
+                          title={`未入力: ${missingLabels.join(', ')}`}
+                          style={{ marginLeft: 8, verticalAlign: 'middle' }}
+                        >
+                          未入力あり
+                        </span>
+                      )}
+                    </div>
                     <div className="member-initial">{m.initial} | {m.affiliation || '-'}</div>
                   </div>
                 </div>
