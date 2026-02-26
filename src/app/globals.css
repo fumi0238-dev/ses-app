@@ -467,20 +467,6 @@ body {
     opacity: 1;
     visibility: visible;
 }
-tr.row-has-missing {
-    background: #fffbeb !important;
-}
-tr.row-has-missing:hover {
-    background: #fef3c7 !important;
-}
-.member-card.card-has-missing {
-    border-color: #fde68a;
-    background: #fffbeb;
-}
-.member-card.card-has-missing:hover {
-    border-color: #f59e0b;
-    background: #fef3c7;
-}
 
 /* Process Select (inline status change) */
 select.process-select {

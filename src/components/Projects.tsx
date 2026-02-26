@@ -200,7 +200,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
               const missingLabels = getMissingFields(p, PROJECT_REQUIRED_FIELDS);
               const hasMissing = missingLabels.length > 0;
               return (
-                <tr key={p.id} className={hasMissing ? 'row-has-missing' : undefined}>
+                <tr key={p.id}>
                   <td className="th-check">
                     <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} />
                   </td>
@@ -216,7 +216,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                         className="badge badge-missing"
                         data-tooltip={`未入力: ${missingLabels.join(', ')}`}
                         title={`未入力: ${missingLabels.join(', ')}`}
-                        style={{ marginLeft: 6 }}
+                        style={{ marginLeft: 6, verticalAlign: 'middle', position: 'relative', top: -1 }}
                       >
                         未入力あり
                       </span>

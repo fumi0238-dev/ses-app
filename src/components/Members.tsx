@@ -170,7 +170,7 @@ export default function Members({
             return (
               <div
                 key={m.id}
-                className={`member-card${hasMissing ? ' card-has-missing' : ''}`}
+                className="member-card"
                 onClick={() => onDetail(m.id)}
               >
                 <div className="member-card-toprow">
@@ -197,14 +197,13 @@ export default function Members({
                 </div>
                 <div className="member-card-header">
                   <div>
-                    <div className="member-name">
-                      {m.full_name || m.initial}
+                    <div className="member-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{m.full_name || m.initial}</span>
                       {hasMissing && (
                         <span
                           className="badge badge-missing"
                           data-tooltip={`未入力: ${missingLabels.join(', ')}`}
                           title={`未入力: ${missingLabels.join(', ')}`}
-                          style={{ marginLeft: 8, verticalAlign: 'middle' }}
                         >
                           未入力あり
                         </span>
