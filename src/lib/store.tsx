@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Project, Member, Matching, ActivityLog, Note, Task } from './types';
 import { getCurrentTimestamp } from './helpers';
+import { useAuth } from './auth-context';
 
 interface StoreContextType {
   loading: boolean;
@@ -45,6 +46,7 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -283,12 +285,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const res = await fetch('/api/activity-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, target_table: targetTable, target_id: targetId, target_name: targetName, detail, timestamp: getCurrentTimestamp() }),
+      body: JSON.stringify({
+        action, target_table: targetTable, target_id: targetId, target_name: targetName, detail, timestamp: getCurrentTimestamp(),
+        user_id: user?.id ?? '',
+        user_name: user?.display_name ?? '',
+      }),
     });
     if (!res.ok) throw new Error('Failed to log activity');
     const record: ActivityLog = await res.json();
     setActivityLogs(prev => [record, ...prev].slice(0, 100));
-  }, []);
+  }, [user]);
 
   // Import
   const importRecords = useCallback(async (table: 'projects' | 'members', records: Record<string, string>[], mode: 'append' | 'replace'): Promise<number> => {

@@ -1,3 +1,13 @@
+export const USER_ROLES = ['admin', 'manager', 'user'] as const;
+export type UserRole = typeof USER_ROLES[number];
+
+export interface User {
+  id: string;
+  username: string;
+  display_name: string;
+  role: UserRole;
+}
+
 export const PROJECT_STATUSES = ['Open', 'Closed', 'Hold'] as const;
 export type ProjectStatus = typeof PROJECT_STATUSES[number];
 
@@ -84,6 +94,8 @@ export interface ActivityLog {
   target_name: string;
   detail: string;
   timestamp: string;
+  user_id: string;
+  user_name: string;
 }
 
 export interface Note {

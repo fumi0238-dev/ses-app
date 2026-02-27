@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   FaBolt, FaChartPie, FaBriefcase, FaUsers, FaHandshake, FaUser, FaBars,
-  FaClipboardList,
+  FaClipboardList, FaSignOutAlt, FaLock, FaChevronUp,
 } from 'react-icons/fa';
 import { TbLayoutSidebarLeftCollapse, TbLayoutSidebarLeftExpand } from 'react-icons/tb';
 
+import { useAuth } from '../lib/auth-context';
 import { StoreProvider, useStore } from '../lib/store';
 import { Project, Member, Matching, PageName, MatchingStatus, MemberProcess } from '../lib/types';
+import Login from '../components/Login';
 import { formatDate, formatDateForFile, getDefaultTasksForStatus } from '../lib/helpers';
 
 import Toast from '../components/Toast';
@@ -23,9 +25,26 @@ import MemberFormModal from '../components/modals/MemberFormModal';
 import MatchingFormModal, { MatchingFormData } from '../components/modals/MatchingFormModal';
 import { ProjectDetailModal, MemberDetailModal } from '../components/modals/DetailModals';
 import ImportModal from '../components/modals/ImportModal';
+import ChangePasswordModal from '../components/modals/ChangePasswordModal';
 
-// ---- Inner App (needs StoreProvider) ----
+// ---- Auth gate ----
+// initialized が false の間は何も描画しない（SSR=null, 初回hydration=null → 一致）。
+// useEffect で localStorage 復元完了後に initialized=true → 描画開始。
 function App() {
+  const { user, initialized } = useAuth();
+
+  if (!initialized) return null;
+
+  return (
+    <StoreProvider>
+      <AuthenticatedApp />
+      {!user && <Login />}
+    </StoreProvider>
+  );
+}
+
+function AuthenticatedApp() {
+  const { user, logout } = useAuth();
   const store = useStore();
   const [currentPage, setCurrentPage] = useState<PageName>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,6 +58,21 @@ function App() {
   const [memberFormData, setMemberFormData] = useState<Partial<Member> | null>(null);
   const [matchingFormData, setMatchingFormData] = useState<MatchingFormData | null>(null);
   const [importTarget, setImportTarget] = useState<'projects' | 'members' | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // ポップオーバーメニュー外クリックで閉じる
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showUserMenu]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -259,14 +293,42 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <div className="user-info">
+        <div className="sidebar-footer" ref={userMenuRef}>
+          <button
+            className="user-menu-trigger"
+            onClick={() => setShowUserMenu(v => !v)}
+          >
             <div className="user-avatar"><FaUser /></div>
             <div className="user-detail sidebar-label">
-              <span className="user-name">増井</span>
-              <span className="user-role">Sales Manager</span>
+              <span className="user-name">{user?.display_name}</span>
+              <span className="user-role">{user?.role === 'admin' ? '管理者' : user?.role === 'manager' ? 'マネージャー' : 'メンバー'}</span>
             </div>
-          </div>
+            <FaChevronUp className={`sidebar-label user-menu-chevron${showUserMenu ? ' open' : ''}`} />
+          </button>
+          {showUserMenu && (
+            <div className="user-menu">
+              <button
+                className="user-menu-item"
+                onClick={() => { setShowUserMenu(false); setShowChangePassword(true); }}
+              >
+                <FaLock style={{ fontSize: 13 }} />
+                <span>パスワード変更</span>
+              </button>
+              <div className="user-menu-divider" />
+              <button
+                className="user-menu-item user-menu-item-danger"
+                onClick={() => {
+                  if (confirm('ログアウトしますか？')) {
+                    setShowUserMenu(false);
+                    logout();
+                  }
+                }}
+              >
+                <FaSignOutAlt style={{ fontSize: 13 }} />
+                <span>ログアウト</span>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -433,16 +495,23 @@ function App() {
         />
       )}
 
+      {showChangePassword && user && (
+        <ChangePasswordModal
+          userId={user.id}
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={() => {
+            setShowChangePassword(false);
+            showToast('パスワードを変更しました');
+          }}
+        />
+      )}
+
       <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
 
-// ---- Root page wrapped in StoreProvider ----
+// ---- Root page ----
 export default function Page() {
-  return (
-    <StoreProvider>
-      <App />
-    </StoreProvider>
-  );
+  return <App />;
 }

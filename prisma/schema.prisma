@@ -118,6 +118,8 @@ model ActivityLog {
   target_name  String?
   detail       String?
   timestamp    String?
+  user_id      String?
+  user_name    String?
   created_at   BigInt @default(0)
 
   @@map("activity_logs")
@@ -132,4 +134,17 @@ model Note {
   created_at   BigInt @default(0)
 
   @@map("notes")
+}
+
+model User {
+  id            String  @id @default(uuid())
+  username      String  @unique
+  password_hash String
+  display_name  String
+  role          String  @default("user")
+  is_active     Boolean @default(true)
+  created_at    BigInt  @default(0)
+  updated_at    BigInt  @default(0)
+
+  @@map("users")
 }

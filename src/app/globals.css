@@ -34,7 +34,6 @@ body {
     font-family: 'Noto Sans JP', 'Inter', -apple-system, sans-serif;
     background: var(--bg);
     color: var(--text);
-    display: flex;
     min-height: 100vh;
 }
 
@@ -98,8 +97,35 @@ body {
 .sidebar-footer {
     padding: 16px 20px;
     border-top: 1px solid rgba(255,255,255,0.1);
+    position: relative;
 }
-.user-info { display: flex; align-items: center; gap: 12px; }
+.user-menu-trigger {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.user-menu-trigger:hover {
+    background: rgba(255,255,255,0.08);
+}
+.user-menu-chevron {
+    margin-left: auto;
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.user-menu-chevron.open {
+    transform: rotate(180deg);
+}
 .user-avatar {
     width: 36px; height: 36px;
     background: var(--primary);
@@ -108,10 +134,52 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 14px;
+    flex-shrink: 0;
 }
-.user-detail { display: flex; flex-direction: column; }
-.user-name { font-size: 14px; font-weight: 600; }
+.user-detail { display: flex; flex-direction: column; min-width: 0; }
+.user-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-role { font-size: 11px; color: rgba(255,255,255,0.5); }
+/* User popover menu */
+.user-menu {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: calc(100% + 8px);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    padding: 6px;
+    z-index: 100;
+}
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s;
+}
+.user-menu-item:hover {
+    background: var(--bg-hover);
+}
+.user-menu-item-danger {
+    color: #ef4444;
+}
+.user-menu-item-danger:hover {
+    background: #fef2f2;
+}
+.user-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
 
 /* Sidebar collapse toggle */
 .sidebar-collapse-btn {
@@ -159,8 +227,14 @@ body {
 .sidebar.collapsed .sidebar-footer {
     padding: 16px 8px;
 }
-.sidebar.collapsed .user-info {
+.sidebar.collapsed .user-menu-trigger {
     justify-content: center;
+}
+.sidebar.collapsed .user-menu {
+    left: 68px;
+    right: auto;
+    bottom: 0;
+    width: 200px;
 }
 
 /* Main */
@@ -644,6 +718,13 @@ select.process-select:focus {
 }
 .modal-close:hover { color: var(--text); }
 .modal-body { padding: 24px; }
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+}
 
 /* Form */
 .form-grid {
@@ -1852,3 +1933,104 @@ select.process-select:focus {
     .kanban-board { flex-direction: column; }
     .kanban-column { max-width: 100%; min-width: 100%; }
 }
+
+/* ==================== Login Page ==================== */
+.login-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sidebar-bg);
+    background-image: radial-gradient(ellipse at 30% 20%, rgba(79, 70, 229, 0.15) 0%, transparent 60%),
+                      radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.1) 0%, transparent 60%);
+}
+.login-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 48px 40px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    animation: modalIn 0.3s ease;
+}
+.login-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.login-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--sidebar-bg);
+}
+.login-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.login-field {
+    position: relative;
+}
+.login-field-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.login-field input {
+    width: 100%;
+    padding: 12px 14px 12px 42px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+.login-field input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+.login-field input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.login-error {
+    background: #fef2f2;
+    color: var(--danger);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid #fecaca;
+}
+.login-submit {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    justify-content: center;
+    margin-top: 8px;
+}
+.login-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* (旧 logout-btn は user-menu に統合済み) */

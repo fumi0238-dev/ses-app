@@ -3,7 +3,7 @@ import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import path from 'path';
 
 // Bump this version whenever the Prisma schema changes (migration / new fields)
-const PRISMA_SCHEMA_VERSION = 4;
+const PRISMA_SCHEMA_VERSION = 6;
 
 declare global {
   // eslint-disable-next-line no-var

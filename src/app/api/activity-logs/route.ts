@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
         target_name: body.target_name ?? '',
         detail: body.detail ?? '',
         timestamp: body.timestamp ?? '',
+        user_id: body.user_id ?? '',
+        user_name: body.user_name ?? '',
         created_at: now,
       },
     });

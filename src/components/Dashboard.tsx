@@ -164,6 +164,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
                   <span className="recent-item-name">
                     {getActionIcon(log.action)} <strong>{log.action}</strong> {log.target_name || ''}
                     {log.detail ? <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}> - {log.detail}</span> : ''}
+                    {log.user_name ? <span style={{ color: 'var(--text-secondary)', fontSize: 12, marginLeft: 8 }}>by {log.user_name}</span> : ''}
                   </span>
                   <span className="recent-item-meta">{log.timestamp}</span>
                 </div>
