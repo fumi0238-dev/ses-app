@@ -2034,3 +2034,47 @@ select.process-select:focus {
 }
 
 /* (旧 logout-btn は user-menu に統合済み) */
+
+/* ---- Manual Matching Selector ---- */
+.selector-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 8px 0;
+}
+.selector-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+.selector-item:last-child { border-bottom: none; }
+.selector-item:hover { background: var(--bg); }
+.selector-item.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.selector-item-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.selector-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.selector-item-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

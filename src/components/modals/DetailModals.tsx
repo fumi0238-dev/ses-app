@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FaTimes, FaBriefcase, FaUsers, FaStickyNote, FaEdit } from 'react-icons/fa';
+import { FaTimes, FaBriefcase, FaUsers, FaStickyNote, FaEdit, FaHandshake, FaSearch, FaPlus } from 'react-icons/fa';
 import { Project, Member, Matching, Note } from '../../lib/types';
 import { truncate, getMatchingBadgeClass, getProcessBadgeClass } from '../../lib/helpers';
 
@@ -80,11 +80,33 @@ interface ProjectDetailProps {
   onEdit: () => void;
   onAddNote: (targetTable: string, targetId: string, content: string) => void;
   onDeleteNote: (id: string) => void;
+  onOpenMatchingForm: (projectId: string, memberId: string) => void;
 }
 
-export function ProjectDetailModal({ project, members, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote }: ProjectDetailProps) {
+export function ProjectDetailModal({ project, members, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote, onOpenMatchingForm }: ProjectDetailProps) {
+  const [showSelector, setShowSelector] = useState(false);
+  const [selectorSearch, setSelectorSearch] = useState('');
+
   if (!project) return null;
   const relatedMatchings = matchings.filter(mt => mt.project_id === project.id);
+
+  const alreadyMatchedMemberIds = new Set(relatedMatchings.map(mt => mt.member_id));
+  const filteredMembers = members.filter(m => {
+    if (!selectorSearch) return true;
+    const q = selectorSearch.toLowerCase();
+    return (
+      (m.full_name || '').toLowerCase().includes(q) ||
+      (m.initial || '').toLowerCase().includes(q) ||
+      (m.skill_tags || '').toLowerCase().includes(q) ||
+      (m.affiliation || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleSelectMember = (memberId: string) => {
+    onOpenMatchingForm(project.id, memberId);
+    setShowSelector(false);
+    setSelectorSearch('');
+  };
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -170,6 +192,52 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
               </div>
             </div>
           )}
+          <div className="detail-section">
+            <h4><FaHandshake style={{ color: 'var(--primary)', marginRight: 4, fontSize: 13 }} />マッチング登録</h4>
+            {!showSelector ? (
+              <button className="btn btn-sm btn-primary" onClick={() => setShowSelector(true)}>
+                <FaPlus style={{ marginRight: 4 }} />要員を選んでマッチング登録
+              </button>
+            ) : (
+              <div>
+                <div className="search-box" style={{ marginBottom: 8 }}>
+                  <FaSearch className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="要員名・スキル・所属で絞り込み..."
+                    value={selectorSearch}
+                    onChange={e => setSelectorSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="selector-list">
+                  {filteredMembers.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+                      該当する要員がありません
+                    </div>
+                  ) : filteredMembers.map(m => {
+                    const isMatched = alreadyMatchedMemberIds.has(m.id);
+                    return (
+                      <div key={m.id} className={`selector-item${isMatched ? ' disabled' : ''}`}>
+                        <div className="selector-item-info">
+                          <span className="selector-item-name">{m.full_name || m.initial || '(名前なし)'}</span>
+                          <span className="selector-item-sub">{m.affiliation || ''}{m.desired_price ? ` / ${m.desired_price}` : ''}</span>
+                          {isMatched && <span className="badge badge-proposed" style={{ fontSize: 10, padding: '2px 6px' }}>提案済</span>}
+                        </div>
+                        <button className="btn btn-sm btn-primary" disabled={isMatched} onClick={() => handleSelectMember(m.id)}>
+                          選択
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => { setShowSelector(false); setSelectorSearch(''); }}>
+                  キャンセル
+                </button>
+              </div>
+            )}
+          </div>
+
           {relatedMatchings.length > 0 && (
             <div className="detail-section">
               <h4><FaUsers style={{ color: 'var(--primary)', marginRight: 4, fontSize: 13 }} />提案中の要員（{relatedMatchings.length}件）</h4>
@@ -209,11 +277,33 @@ interface MemberDetailProps {
   onEdit: () => void;
   onAddNote: (targetTable: string, targetId: string, content: string) => void;
   onDeleteNote: (id: string) => void;
+  onOpenMatchingForm: (projectId: string, memberId: string) => void;
 }
 
-export function MemberDetailModal({ member, projects, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote }: MemberDetailProps) {
+export function MemberDetailModal({ member, projects, matchings, notes, onClose, onEdit, onAddNote, onDeleteNote, onOpenMatchingForm }: MemberDetailProps) {
+  const [showSelector, setShowSelector] = useState(false);
+  const [selectorSearch, setSelectorSearch] = useState('');
+
   if (!member) return null;
   const relatedMatchings = matchings.filter(mt => mt.member_id === member.id);
+
+  const alreadyMatchedProjectIds = new Set(relatedMatchings.map(mt => mt.project_id));
+  const filteredProjects = projects.filter(p => {
+    if (!selectorSearch) return true;
+    const q = selectorSearch.toLowerCase();
+    return (
+      (p.project_name_rewrite || '').toLowerCase().includes(q) ||
+      (p.project_name_original || '').toLowerCase().includes(q) ||
+      (p.required_skill_tags || '').toLowerCase().includes(q) ||
+      (p.role || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleSelectProject = (projectId: string) => {
+    onOpenMatchingForm(projectId, member.id);
+    setShowSelector(false);
+    setSelectorSearch('');
+  };
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -277,6 +367,52 @@ export function MemberDetailModal({ member, projects, matchings, notes, onClose,
             <h4>営業コメント</h4>
             <div className="detail-item-value long-text">{member.sales_comment || '-'}</div>
           </div>
+          <div className="detail-section">
+            <h4><FaHandshake style={{ color: 'var(--primary)', marginRight: 4, fontSize: 13 }} />マッチング登録</h4>
+            {!showSelector ? (
+              <button className="btn btn-sm btn-primary" onClick={() => setShowSelector(true)}>
+                <FaPlus style={{ marginRight: 4 }} />案件を選んでマッチング登録
+              </button>
+            ) : (
+              <div>
+                <div className="search-box" style={{ marginBottom: 8 }}>
+                  <FaSearch className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="案件名・スキル・職種で絞り込み..."
+                    value={selectorSearch}
+                    onChange={e => setSelectorSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="selector-list">
+                  {filteredProjects.length === 0 ? (
+                    <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+                      該当する案件がありません
+                    </div>
+                  ) : filteredProjects.map(p => {
+                    const isMatched = alreadyMatchedProjectIds.has(p.id);
+                    return (
+                      <div key={p.id} className={`selector-item${isMatched ? ' disabled' : ''}`}>
+                        <div className="selector-item-info">
+                          <span className="selector-item-name">{truncate(p.project_name_rewrite || p.project_name_original || '(案件名なし)', 40)}</span>
+                          <span className="selector-item-sub">{p.role || ''}{p.purchase_price ? ` / ${p.purchase_price}` : ''}</span>
+                          {isMatched && <span className="badge badge-proposed" style={{ fontSize: 10, padding: '2px 6px' }}>提案済</span>}
+                        </div>
+                        <button className="btn btn-sm btn-primary" disabled={isMatched} onClick={() => handleSelectProject(p.id)}>
+                          選択
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button className="btn btn-sm btn-secondary" style={{ marginTop: 8 }} onClick={() => { setShowSelector(false); setSelectorSearch(''); }}>
+                  キャンセル
+                </button>
+              </div>
+            )}
+          </div>
+
           {relatedMatchings.length > 0 && (
             <div className="detail-section">
               <h4><FaBriefcase style={{ color: 'var(--primary)', marginRight: 4, fontSize: 13 }} />提案中の案件（{relatedMatchings.length}件）</h4>

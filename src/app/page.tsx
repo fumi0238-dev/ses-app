@@ -446,6 +446,7 @@ function AuthenticatedApp() {
           }}
           onAddNote={store.addNote}
           onDeleteNote={store.deleteNote}
+          onOpenMatchingForm={handleOpenMatchingForm}
         />
       )}
       {memberDetailId && (
@@ -461,6 +462,7 @@ function AuthenticatedApp() {
           }}
           onAddNote={store.addNote}
           onDeleteNote={store.deleteNote}
+          onOpenMatchingForm={handleOpenMatchingForm}
         />
       )}
       {projectFormData !== null && (
