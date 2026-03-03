@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   FaBolt, FaChartPie, FaBriefcase, FaUsers, FaHandshake, FaUser, FaBars,
-  FaClipboardList, FaSignOutAlt, FaLock, FaChevronUp,
+  FaClipboardList, FaCheckSquare, FaSignOutAlt, FaLock, FaChevronUp,
 } from 'react-icons/fa';
 import { TbLayoutSidebarLeftCollapse, TbLayoutSidebarLeftExpand } from 'react-icons/tb';
 
@@ -19,6 +19,7 @@ import Projects from '../components/Projects';
 import Members from '../components/Members';
 import MatchingPage from '../components/Matching';
 import ProgressPage from '../components/Progress';
+import TasksPage from '../components/tasks/TasksPage';
 
 import ProjectFormModal from '../components/modals/ProjectFormModal';
 import MemberFormModal from '../components/modals/MemberFormModal';
@@ -89,6 +90,7 @@ function AuthenticatedApp() {
     members: '要員管理',
     matching: 'マッチング',
     progress: '進捗管理',
+    tasks: 'タスク管理',
   };
 
   // ---- Project handlers ----
@@ -281,6 +283,7 @@ function AuthenticatedApp() {
             { page: 'members', Icon: FaUsers, label: '要員管理' },
             { page: 'matching', Icon: FaHandshake, label: 'マッチング' },
             { page: 'progress', Icon: FaClipboardList, label: '進捗管理' },
+            { page: 'tasks', Icon: FaCheckSquare, label: 'タスク管理' },
           ] as Array<{ page: PageName; Icon: React.ComponentType<{ style?: React.CSSProperties }>; label: string }>).map(({ page, Icon, label }) => (
             <button
               key={page}
@@ -429,6 +432,9 @@ function AuthenticatedApp() {
             onDeleteTask={store.deleteTask}
             onBulkAddTasks={store.bulkAddTasks}
           />
+        )}
+        {!store.loading && currentPage === 'tasks' && (
+          <TasksPage />
         )}
       </main>
 

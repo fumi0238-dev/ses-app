@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: ['better-sqlite3'],
   turbopack: {
-    root: path.resolve('.'),
+    root: path.resolve(import.meta.dirname, '../../..'),
   },
 };
 

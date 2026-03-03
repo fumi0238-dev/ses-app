@@ -120,7 +120,59 @@ export interface Task {
 
 export const TASK_PROGRESS_STATUSES = ['未着手', '対応中', '完了'] as const;
 
-export type PageName = 'dashboard' | 'projects' | 'members' | 'matching' | 'progress';
+// ---- General Task Management (Asana-like) ----
+
+export const GENERAL_TASK_STATUSES = ['未着手', '対応中', '待ち', '完了'] as const;
+export type GeneralTaskStatus = typeof GENERAL_TASK_STATUSES[number];
+
+export const TASK_PRIORITIES = ['高', '中', '低', 'なし'] as const;
+export type TaskPriority = typeof TASK_PRIORITIES[number];
+
+export const TAG_COLORS = ['gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'] as const;
+export type TagColor = typeof TAG_COLORS[number];
+
+export interface TaskSection {
+  id: string;
+  name: string;
+  sort_order: number;
+  collapsed: boolean;
+}
+
+export interface TaskTag {
+  id: string;
+  name: string;
+  color: TagColor;
+}
+
+export interface GeneralTask {
+  id: string;
+  title: string;
+  description: string;
+  status: GeneralTaskStatus;
+  priority: TaskPriority;
+  assignee: string;
+  due_date: string;
+  sort_order: number;
+  completed_at: number | null;
+  section_id: string | null;
+  parent_id: string | null;
+  linked_project_id: string | null;
+  linked_member_id: string | null;
+  linked_matching_id: string | null;
+  tags: TaskTag[];
+  children?: GeneralTask[];
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  content: string;
+  user_id: string;
+  user_name: string;
+  created_at: number;
+}
+
+export type PageName = 'dashboard' | 'projects' | 'members' | 'matching' | 'progress' | 'tasks';
 
 // --- Required Fields Config ---
 // 一覧で「未入力あり」バッジを表示するための必須項目定義。

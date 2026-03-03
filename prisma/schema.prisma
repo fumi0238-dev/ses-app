@@ -148,3 +148,78 @@ model User {
 
   @@map("users")
 }
+
+// ---- Asana-like General Task Management ----
+
+model TaskSection {
+  id         String        @id @default(uuid())
+  name       String        @default("")
+  sort_order Int           @default(0)
+  collapsed  Boolean       @default(false)
+  created_at BigInt        @default(0)
+  updated_at BigInt        @default(0)
+  tasks      GeneralTask[]
+
+  @@map("task_sections")
+}
+
+model GeneralTask {
+  id                 String              @id @default(uuid())
+  title              String              @default("")
+  description        String              @default("")
+  status             String              @default("未着手")
+  priority           String              @default("なし")
+  assignee           String              @default("")
+  due_date           String              @default("")
+  sort_order         Int                 @default(0)
+  completed_at       BigInt?
+  section_id         String?
+  parent_id          String?
+  linked_project_id  String?
+  linked_member_id   String?
+  linked_matching_id String?
+  created_at         BigInt              @default(0)
+  updated_at         BigInt              @default(0)
+  deleted            Boolean             @default(false)
+
+  section  TaskSection?      @relation(fields: [section_id], references: [id])
+  parent   GeneralTask?      @relation("SubTasks", fields: [parent_id], references: [id])
+  children GeneralTask[]     @relation("SubTasks")
+  tags     TaskTagAssignment[]
+  comments TaskComment[]
+
+  @@map("general_tasks")
+}
+
+model TaskTag {
+  id         String              @id @default(uuid())
+  name       String              @default("")
+  color      String              @default("gray")
+  created_at BigInt              @default(0)
+  tasks      TaskTagAssignment[]
+
+  @@map("task_tags")
+}
+
+model TaskTagAssignment {
+  id      String      @id @default(uuid())
+  task_id String
+  tag_id  String
+  task    GeneralTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  tag     TaskTag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, tag_id])
+  @@map("task_tag_assignments")
+}
+
+model TaskComment {
+  id         String      @id @default(uuid())
+  task_id    String
+  content    String      @default("")
+  user_id    String      @default("")
+  user_name  String      @default("")
+  created_at BigInt      @default(0)
+  task       GeneralTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}

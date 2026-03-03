@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Project, Member, Matching, ActivityLog, Note, Task } from './types';
+import { Project, Member, Matching, ActivityLog, Note, Task, GeneralTask, TaskSection, TaskTag, TaskComment } from './types';
 import { getCurrentTimestamp } from './helpers';
 import { useAuth } from './auth-context';
 
@@ -41,6 +41,24 @@ interface StoreContextType {
   logActivity: (action: string, targetTable: string, targetId: string, targetName: string, detail: string) => Promise<void>;
 
   importRecords: (table: 'projects' | 'members', records: Record<string, string>[], mode: 'append' | 'replace') => Promise<number>;
+
+  // General Tasks (Asana-like)
+  generalTasks: GeneralTask[];
+  taskSections: TaskSection[];
+  taskTags: TaskTag[];
+  addGeneralTask: (data: Partial<GeneralTask> & { tag_ids?: string[] }) => Promise<GeneralTask>;
+  updateGeneralTask: (id: string, data: Partial<GeneralTask> & { tag_ids?: string[] }) => Promise<GeneralTask>;
+  deleteGeneralTask: (id: string) => Promise<void>;
+  reorderGeneralTask: (taskId: string, newSectionId: string | null, newSortOrder: number) => Promise<void>;
+  addTaskSection: (name: string) => Promise<TaskSection>;
+  updateTaskSection: (id: string, data: Partial<TaskSection>) => Promise<void>;
+  deleteTaskSection: (id: string) => Promise<void>;
+  addTaskTag: (name: string, color: string) => Promise<TaskTag>;
+  updateTaskTag: (id: string, data: Partial<TaskTag>) => Promise<void>;
+  deleteTaskTag: (id: string) => Promise<void>;
+  fetchTaskComments: (taskId: string) => Promise<TaskComment[]>;
+  addTaskComment: (taskId: string, content: string) => Promise<TaskComment>;
+  deleteTaskComment: (id: string) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -54,17 +72,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [generalTasks, setGeneralTasks] = useState<GeneralTask[]>([]);
+  const [taskSections, setTaskSections] = useState<TaskSection[]>([]);
+  const [taskTags, setTaskTags] = useState<TaskTag[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [proj, mem, match, logs, nt, tk] = await Promise.all([
+        const [proj, mem, match, logs, nt, tk, gt, ts, tt] = await Promise.all([
           fetch('/api/projects').then(r => { if (!r.ok) throw new Error('projects'); return r.json(); }),
           fetch('/api/members').then(r => { if (!r.ok) throw new Error('members'); return r.json(); }),
           fetch('/api/matchings').then(r => { if (!r.ok) throw new Error('matchings'); return r.json(); }),
           fetch('/api/activity-logs').then(r => { if (!r.ok) throw new Error('activity-logs'); return r.json(); }),
           fetch('/api/notes').then(r => { if (!r.ok) throw new Error('notes'); return r.json(); }),
           fetch('/api/tasks').then(r => { if (!r.ok) throw new Error('tasks'); return r.json(); }),
+          fetch('/api/general-tasks').then(r => { if (!r.ok) throw new Error('general-tasks'); return r.json(); }),
+          fetch('/api/task-sections').then(r => { if (!r.ok) throw new Error('task-sections'); return r.json(); }),
+          fetch('/api/task-tags').then(r => { if (!r.ok) throw new Error('task-tags'); return r.json(); }),
         ]);
         setProjects(proj);
         setMembers(mem);
@@ -72,6 +96,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setActivityLogs(logs);
         setNotes(nt);
         setTasks(tk);
+        setGeneralTasks(gt);
+        setTaskSections(ts);
+        setTaskTags(tt);
       } catch (e) {
         console.error('Failed to load initial data:', e);
       } finally {
@@ -336,6 +363,162 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return records.length;
   }, []);
 
+  // ---- General Tasks (Asana-like) ----
+  const addGeneralTask = useCallback(async (data: Partial<GeneralTask> & { tag_ids?: string[] }): Promise<GeneralTask> => {
+    const res = await fetch('/api/general-tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to add general task');
+    const record: GeneralTask = await res.json();
+    if (record.parent_id) {
+      // Subtask: add to parent's children
+      setGeneralTasks(prev => prev.map(t =>
+        t.id === record.parent_id ? { ...t, children: [...(t.children || []), record] } : t
+      ));
+    } else {
+      setGeneralTasks(prev => [...prev, record]);
+    }
+    return record;
+  }, []);
+
+  const updateGeneralTask = useCallback(async (id: string, data: Partial<GeneralTask> & { tag_ids?: string[] }): Promise<GeneralTask> => {
+    const res = await fetch(`/api/general-tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update general task');
+    const record: GeneralTask = await res.json();
+    setGeneralTasks(prev => {
+      // Update in top-level or as child
+      return prev.map(t => {
+        if (t.id === id) return record;
+        if (t.children?.some(c => c.id === id)) {
+          return { ...t, children: t.children.map(c => c.id === id ? record : c) };
+        }
+        return t;
+      });
+    });
+    return record;
+  }, []);
+
+  const deleteGeneralTask = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/general-tasks/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete general task');
+    setGeneralTasks(prev => prev
+      .filter(t => t.id !== id)
+      .map(t => t.children?.some(c => c.id === id)
+        ? { ...t, children: t.children.filter(c => c.id !== id) }
+        : t
+      )
+    );
+  }, []);
+
+  const reorderGeneralTask = useCallback(async (taskId: string, newSectionId: string | null, newSortOrder: number): Promise<void> => {
+    const res = await fetch('/api/general-tasks/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, new_section_id: newSectionId, new_sort_order: newSortOrder }),
+    });
+    if (!res.ok) throw new Error('Failed to reorder task');
+    setGeneralTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, section_id: newSectionId, sort_order: newSortOrder } : t
+    ));
+  }, []);
+
+  // ---- Task Sections ----
+  const addTaskSection = useCallback(async (name: string): Promise<TaskSection> => {
+    const maxOrder = taskSections.reduce((max, s) => Math.max(max, s.sort_order), -1);
+    const res = await fetch('/api/task-sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, sort_order: maxOrder + 1 }),
+    });
+    if (!res.ok) throw new Error('Failed to add section');
+    const record: TaskSection = await res.json();
+    setTaskSections(prev => [...prev, record]);
+    return record;
+  }, [taskSections]);
+
+  const updateTaskSection = useCallback(async (id: string, data: Partial<TaskSection>): Promise<void> => {
+    const res = await fetch(`/api/task-sections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update section');
+    const record: TaskSection = await res.json();
+    setTaskSections(prev => prev.map(s => s.id === id ? record : s));
+  }, []);
+
+  const deleteTaskSection = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/task-sections/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete section');
+    setTaskSections(prev => prev.filter(s => s.id !== id));
+    // Tasks in this section become sectionless
+    setGeneralTasks(prev => prev.map(t => t.section_id === id ? { ...t, section_id: null } : t));
+  }, []);
+
+  // ---- Task Tags ----
+  const addTaskTag = useCallback(async (name: string, color: string): Promise<TaskTag> => {
+    const res = await fetch('/api/task-tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color }),
+    });
+    if (!res.ok) throw new Error('Failed to add tag');
+    const record: TaskTag = await res.json();
+    setTaskTags(prev => [...prev, record]);
+    return record;
+  }, []);
+
+  const updateTaskTag = useCallback(async (id: string, data: Partial<TaskTag>): Promise<void> => {
+    const res = await fetch(`/api/task-tags/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update tag');
+    const record: TaskTag = await res.json();
+    setTaskTags(prev => prev.map(t => t.id === id ? record : t));
+  }, []);
+
+  const deleteTaskTag = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/task-tags/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete tag');
+    setTaskTags(prev => prev.filter(t => t.id !== id));
+    // Remove tag from tasks
+    setGeneralTasks(prev => prev.map(t => ({
+      ...t,
+      tags: t.tags.filter(tag => tag.id !== id),
+      children: t.children?.map(c => ({ ...c, tags: c.tags.filter(tag => tag.id !== id) })),
+    })));
+  }, []);
+
+  // ---- Task Comments ----
+  const fetchTaskComments = useCallback(async (taskId: string): Promise<TaskComment[]> => {
+    const res = await fetch(`/api/task-comments?task_id=${taskId}`);
+    if (!res.ok) throw new Error('Failed to fetch comments');
+    return res.json();
+  }, []);
+
+  const addTaskComment = useCallback(async (taskId: string, content: string): Promise<TaskComment> => {
+    const res = await fetch('/api/task-comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, content, user_id: user?.id ?? '', user_name: user?.display_name ?? '' }),
+    });
+    if (!res.ok) throw new Error('Failed to add comment');
+    return res.json();
+  }, [user]);
+
+  const deleteTaskComment = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/task-comments/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete comment');
+  }, []);
+
   return (
     <StoreContext.Provider value={{
       loading, projects, members, matchings, activityLogs, notes, tasks,
@@ -346,6 +529,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addNote, deleteNote,
       logActivity,
       importRecords,
+      generalTasks, taskSections, taskTags,
+      addGeneralTask, updateGeneralTask, deleteGeneralTask, reorderGeneralTask,
+      addTaskSection, updateTaskSection, deleteTaskSection,
+      addTaskTag, updateTaskTag, deleteTaskTag,
+      fetchTaskComments, addTaskComment, deleteTaskComment,
     }}>
       {children}
     </StoreContext.Provider>
