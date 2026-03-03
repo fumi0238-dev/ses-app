@@ -22,20 +22,26 @@ export async function GET() {
         tags: { include: { tag: true } },
         children: {
           where: { deleted: false },
-          include: { tags: { include: { tag: true } } },
+          include: {
+            tags: { include: { tag: true } },
+            children: {
+              where: { deleted: false },
+              include: { tags: { include: { tag: true } } },
+              orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+            },
+          },
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
         },
       },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
     });
-    const result = records.map(r => ({
-      ...serialize(r as unknown as Record<string, unknown>),
-      tags: r.tags.map(ta => serializeTag(ta.tag as unknown as Record<string, unknown>)),
-      children: r.children.map(c => ({
-        ...serialize(c as unknown as Record<string, unknown>),
-        tags: c.tags.map(ta => serializeTag(ta.tag as unknown as Record<string, unknown>)),
-      })),
-    }));
+    const serializeTask = (t: typeof records[0]): Record<string, unknown> => ({
+      ...serialize(t as unknown as Record<string, unknown>),
+      tags: t.tags.map(ta => serializeTag(ta.tag as unknown as Record<string, unknown>)),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      children: (t.children ?? []).map((c: any) => serializeTask(c)),
+    });
+    const result = records.map(r => serializeTask(r));
     return NextResponse.json(result);
   } catch (e) {
     console.error('GET /api/general-tasks error:', e);

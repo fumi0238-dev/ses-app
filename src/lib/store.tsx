@@ -373,10 +373,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error('Failed to add general task');
     const record: GeneralTask = await res.json();
     if (record.parent_id) {
-      // Subtask: add to parent's children
-      setGeneralTasks(prev => prev.map(t =>
-        t.id === record.parent_id ? { ...t, children: [...(t.children || []), record] } : t
-      ));
+      // Subtask or grandchild: add to parent's children (up to 2 levels deep)
+      setGeneralTasks(prev => prev.map(t => {
+        if (t.id === record.parent_id) {
+          return { ...t, children: [...(t.children || []), record] };
+        }
+        // Check grandchild level: parent might be a child of t
+        if (t.children?.some(c => c.id === record.parent_id)) {
+          return {
+            ...t,
+            children: t.children.map(c =>
+              c.id === record.parent_id ? { ...c, children: [...(c.children || []), record] } : c
+            ),
+          };
+        }
+        return t;
+      }));
     } else {
       setGeneralTasks(prev => [...prev, record]);
     }
@@ -392,11 +404,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error('Failed to update general task');
     const record: GeneralTask = await res.json();
     setGeneralTasks(prev => {
-      // Update in top-level or as child
+      // Update in top-level, as child, or as grandchild (2 levels deep)
       return prev.map(t => {
-        if (t.id === id) return record;
+        if (t.id === id) return { ...record, children: t.children };
         if (t.children?.some(c => c.id === id)) {
-          return { ...t, children: t.children.map(c => c.id === id ? record : c) };
+          return { ...t, children: t.children.map(c => c.id === id ? { ...record, children: c.children } : c) };
+        }
+        // Check grandchild level
+        if (t.children?.some(c => c.children?.some(gc => gc.id === id))) {
+          return {
+            ...t,
+            children: t.children.map(c =>
+              c.children?.some(gc => gc.id === id)
+                ? { ...c, children: c.children.map(gc => gc.id === id ? record : gc) }
+                : c
+            ),
+          };
         }
         return t;
       });
@@ -409,10 +432,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!res.ok) throw new Error('Failed to delete general task');
     setGeneralTasks(prev => prev
       .filter(t => t.id !== id)
-      .map(t => t.children?.some(c => c.id === id)
-        ? { ...t, children: t.children.filter(c => c.id !== id) }
-        : t
-      )
+      .map(t => {
+        if (t.children?.some(c => c.id === id)) {
+          return { ...t, children: t.children.filter(c => c.id !== id) };
+        }
+        // Check grandchild level
+        if (t.children?.some(c => c.children?.some(gc => gc.id === id))) {
+          return {
+            ...t,
+            children: t.children.map(c =>
+              c.children?.some(gc => gc.id === id)
+                ? { ...c, children: c.children.filter(gc => gc.id !== id) }
+                : c
+            ),
+          };
+        }
+        return t;
+      })
     );
   }, []);
 

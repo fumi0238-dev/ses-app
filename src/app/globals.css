@@ -2212,6 +2212,8 @@ select.process-select:focus {
 .gtask-row.selected { background: var(--primary-light); }
 .gtask-row.subtask .gtask-row-expand { width: 44px; }
 .gtask-row.subtask .gtask-col-title { width: 256px; }
+.gtask-row.grandchild .gtask-row-expand { width: 68px; }
+.gtask-row.grandchild .gtask-col-title { width: 232px; }
 .gtask-row.completed .gtask-title { text-decoration: line-through; color: var(--text-secondary); }
 .gtask-row.gtask-add-sub { cursor: pointer; min-height: 32px; }
 .gtask-row.gtask-add-sub:hover { background: #f8fafc; }
