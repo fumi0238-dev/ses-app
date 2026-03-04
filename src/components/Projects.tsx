@@ -1,9 +1,17 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { FaSearch, FaPlus, FaFileImport, FaFileExport, FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaFileImport, FaFileExport, FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
 import { Project, Matching, PROJECT_STATUSES, SHAREABLE_VALUES, PROJECT_REQUIRED_FIELDS } from '../lib/types';
-import { truncate, getMissingFields } from '../lib/helpers';
+import { truncate, getMissingFields, formatStructuredPrice } from '../lib/helpers';
+
+/** 案件がOpen状態で指定日数以上経過しているか判定 */
+function getDaysOpen(project: Project): number | null {
+  if (project.status !== 'Open' || !project.added_date) return null;
+  const added = new Date(project.added_date);
+  if (isNaN(added.getTime())) return null;
+  return Math.floor((Date.now() - added.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 interface Props {
   projects: Project[];
@@ -59,7 +67,11 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
     }
     if (filterStatus) list = list.filter(p => p.status === filterStatus);
     if (filterShareable) list = list.filter(p => p.shareable === filterShareable);
-    if (filterWorkstyle) list = list.filter(p => (p.work_style || '').includes(filterWorkstyle));
+    if (filterWorkstyle) list = list.filter(p => {
+      // 構造化カテゴリ優先、なければ旧テキストでフォールバック
+      if (p.work_style_category) return p.work_style_category === filterWorkstyle;
+      return (p.work_style || '').includes(filterWorkstyle);
+    });
     if (filterSource) list = list.filter(p => p.source === filterSource);
     if (filterLocation) list = list.filter(p => p.location === filterLocation);
 
@@ -155,6 +167,16 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
         <button className="btn btn-secondary" onClick={onExport}><FaFileExport /> エクスポート</button>
       </div>
 
+      {/* 件数表示 */}
+      <div className="count-bar">
+        <span className="count-bar-label">
+          {filtered.length === projects.length
+            ? <>{projects.length}件</>
+            : <>{filtered.length}<span className="count-bar-total"> / {projects.length}</span>件</>
+          }
+        </span>
+      </div>
+
       {selectedIds.size > 0 && (
         <div className="bulk-action-bar">
           <span className="bulk-count">{selectedIds.size}件選択中</span>
@@ -221,11 +243,29 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                         未入力あり
                       </span>
                     )}
+                    {(() => {
+                      const days = getDaysOpen(p);
+                      if (days !== null && days >= 30) {
+                        return (
+                          <span
+                            className="badge badge-long-open"
+                            title={`${days}日間Openのままです`}
+                            style={{ marginLeft: 6, verticalAlign: 'middle', position: 'relative', top: -1 }}
+                          >
+                            <FaExclamationTriangle style={{ fontSize: 10, marginRight: 3 }} />
+                            {days}日
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </td>
                   <td>{truncate(p.role, 20)}</td>
                   <td>{p.location || '-'}</td>
-                  <td>{p.work_style || '-'}</td>
-                  <td>{p.purchase_price || '-'}</td>
+                  <td>{p.work_style_category
+                    ? `${p.work_style_category}${p.work_style_office_days ? `（週${p.work_style_office_days}日）` : ''}`
+                    : p.work_style || '-'}</td>
+                  <td>{formatStructuredPrice(p.purchase_price_min, p.purchase_price_max) || p.purchase_price || '-'}</td>
                   <td>{truncate(p.source, 15)}</td>
                   <td>
                     {matchCount > 0

@@ -94,6 +94,192 @@ export function getDefaultTasksForStatus(status: MatchingStatus): string[] {
   return map[status] || [];
 }
 
+// 単価テキストから範囲(min/max)を解析する
+export interface PriceRange {
+  min: number;  // 万円単位。不明時は0
+  max: number;  // 万円単位。不明時は0（上限なし）
+}
+
+export function parsePriceRange(text: string | undefined | null): PriceRange {
+  if (!text) return { min: 0, max: 0 };
+  // ゴミデータ除外
+  if (text.startsWith('■') || text.includes('：')) return { min: 0, max: 0 };
+  // 全角チルダ→半角、全角数字→半角
+  const normalized = text
+    .replace(/〜/g, '～')
+    .replace(/~/g, '～')
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  // 数値を抽出（小数点含む）
+  const nums = normalized.match(/[\d.]+/g)?.map(Number).filter(n => n > 0) || [];
+  if (nums.length === 0) return { min: 0, max: 0 };
+  if (nums.length === 1) {
+    const n = nums[0];
+    // "～80万円" パターン（先頭がチルダ）
+    if (/^[～\s]*[\d]/.test(normalized.trim())) {
+      const beforeNum = normalized.substring(0, normalized.indexOf(String(n)));
+      if (beforeNum.includes('～')) return { min: 0, max: n };
+    }
+    // "110万円～" パターン（末尾がチルダ）
+    if (/[\d].*万円?[～]/.test(normalized) || normalized.trim().endsWith('～')) {
+      return { min: n, max: 0 };
+    }
+    return { min: n, max: n };
+  }
+  // 2つ以上の数値 → min～max
+  return { min: Math.min(...nums), max: Math.max(...nums) };
+}
+
+// 単価範囲をフォーマットして表示用文字列に変換
+export function formatPriceRange(range: PriceRange): string {
+  if (range.min === 0 && range.max === 0) return '';
+  if (range.min === 0) return `～${range.max}万`;
+  if (range.max === 0) return `${range.min}万～`;
+  if (range.min === range.max) return `${range.min}万`;
+  return `${range.min}～${range.max}万`;
+}
+
+// 構造化された単価（min/max）を表示用テキストに変換
+export function formatStructuredPrice(min: string | number | null | undefined, max: string | number | null | undefined): string {
+  const minNum = typeof min === 'string' ? parseInt(min) || 0 : (min || 0);
+  const maxNum = typeof max === 'string' ? parseInt(max) || 0 : (max || 0);
+  if (minNum === 0 && maxNum === 0) return '';
+  if (minNum === 0) return `～${maxNum}万円`;
+  if (maxNum === 0) return `${minNum}万円～`;
+  if (minNum === maxNum) return `${minNum}万円`;
+  return `${minNum}～${maxNum}万円`;
+}
+
+// 構造化単価を PriceRange に変換（フォールバック付き）
+export function getStructuredPriceRange(
+  min: string | number | null | undefined,
+  max: string | number | null | undefined,
+  fallbackText?: string | null
+): PriceRange {
+  const minNum = typeof min === 'string' ? parseInt(min) || 0 : (min || 0);
+  const maxNum = typeof max === 'string' ? parseInt(max) || 0 : (max || 0);
+  if (minNum > 0 || maxNum > 0) return { min: minNum, max: maxNum };
+  // フォールバック: 旧テキストからパース
+  return parsePriceRange(fallbackText);
+}
+
+// 働き方テキストを構造化して解析する
+export interface WorkStyleDetail {
+  category: 'remote' | 'hybrid' | 'onsite' | 'flexible' | 'unknown';
+  categoryLabel: string;
+  officeDays: number | null;    // 週あたりの出社日数（判明時）
+  officeDaysText: string;       // "週2～3日出社" 等
+  initialOnsite: boolean;       // 参画初期の出社対応可能か
+  transitionOnsite: boolean;    // 過渡期の出社対応可能か
+  notes: string[];              // その他の特記事項
+}
+
+export function parseWorkStyleDetail(text: string | undefined | null): WorkStyleDetail {
+  const result: WorkStyleDetail = {
+    category: 'unknown',
+    categoryLabel: '不明',
+    officeDays: null,
+    officeDaysText: '',
+    initialOnsite: false,
+    transitionOnsite: false,
+    notes: [],
+  };
+  if (!text) return result;
+  const t = text.trim();
+  if (t.startsWith('■') || t.includes('万円') || /確認中/.test(t)) return result;
+
+  // カテゴリ判定
+  if (/フルリモ|基本リモート|完全リモート|原則リモート/.test(t)) {
+    result.category = 'remote';
+    result.categoryLabel = 'フルリモート';
+  } else if (/リモート併用|リモート可|リモ併用/.test(t)) {
+    result.category = 'hybrid';
+    result.categoryLabel = 'リモート併用';
+  } else if (/オンサイト|常駐|フル出社|出社必須/.test(t)) {
+    result.category = 'onsite';
+    result.categoryLabel = 'オンサイト';
+  } else if (/応相談|柔軟|対応可能/.test(t)) {
+    result.category = 'flexible';
+    result.categoryLabel = '柔軟';
+  } else if (/出社/.test(t) && /リモート/.test(t)) {
+    result.category = 'hybrid';
+    result.categoryLabel = 'リモート併用';
+  } else if (/出社/.test(t)) {
+    result.category = 'onsite';
+    result.categoryLabel = 'オンサイト';
+  } else if (/リモート/.test(t)) {
+    result.category = 'hybrid';
+    result.categoryLabel = 'リモート併用';
+  }
+
+  // 出社日数の抽出
+  const daysMatch = t.match(/週\s*(\d)[～~〜\-]?(\d)?[日]?.*?出社/);
+  if (daysMatch) {
+    const minDays = parseInt(daysMatch[1]);
+    const maxDays = daysMatch[2] ? parseInt(daysMatch[2]) : minDays;
+    result.officeDays = maxDays;
+    result.officeDaysText = minDays === maxDays ? `週${minDays}日出社` : `週${minDays}～${maxDays}日出社`;
+  }
+
+  // 初期オンサイト判定（バッジで表示するため notes には追加しない）
+  if (/初期.*オンサイト|初期.*出社|過渡期.*出社|参画.*オンサイト/.test(t)) {
+    result.initialOnsite = true;
+  }
+
+  // 特記事項の抽出
+  const noteMatch = t.match(/※(.+)/);
+  if (noteMatch) {
+    const note = noteMatch[1].trim();
+    // initialOnsite バッジで既にカバーされている内容はスキップ
+    const coveredByOnsite = result.initialOnsite && /初期|オンサイト|出社/.test(note);
+    if (!coveredByOnsite && !result.notes.some(n => note.includes(n) || n.includes(note))) {
+      result.notes.push(note);
+    }
+  }
+
+  // PC受け取り等
+  if (/PC受け取り/.test(t)) {
+    result.notes.push('PC受取出社あり');
+  }
+
+  return result;
+}
+
+// 構造化された働き方データから WorkStyleDetail を生成（フォールバック付き）
+export function getStructuredWorkStyle(
+  category: string | undefined | null,
+  officeDays: string | undefined | null,
+  initialOnsite: string | boolean | undefined | null,
+  note: string | undefined | null,
+  fallbackText?: string | undefined | null,
+  transitionOnsite?: string | boolean | undefined | null
+): WorkStyleDetail {
+  if (category) {
+    const catMap: Record<string, WorkStyleDetail['category']> = {
+      'フルリモート': 'remote',
+      'リモート併用': 'hybrid',
+      'オンサイト': 'onsite',
+    };
+    return {
+      category: catMap[category] || 'unknown',
+      categoryLabel: category,
+      officeDays: officeDays ? parseInt(String(officeDays)) || null : null,
+      officeDaysText: officeDays ? `週${officeDays}日出社` : '',
+      initialOnsite: initialOnsite === 'true' || initialOnsite === true,
+      transitionOnsite: transitionOnsite === 'true' || transitionOnsite === true,
+      notes: note ? [note] : [],
+    };
+  }
+  // フォールバック: 旧テキストをパース
+  return parseWorkStyleDetail(fallbackText);
+}
+
+// 働き方カテゴリのフィルタ用ラベル（構造化カテゴリの日本語値と一致）
+export const WORK_STYLE_FILTER_OPTIONS = [
+  { value: 'フルリモート', label: 'フルリモート' },
+  { value: 'リモート併用', label: 'リモート併用' },
+  { value: 'オンサイト', label: 'オンサイト' },
+] as const;
+
 export function getMissingFields<T>(
   entity: T,
   requiredFields: RequiredFieldDef<T>[]

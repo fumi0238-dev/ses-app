@@ -1,12 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Project, Member, Matching, ActivityLog, Note, Task, GeneralTask, TaskSection, TaskTag, TaskComment } from './types';
+import { Project, Member, Matching, ActivityLog, Note, Task, GeneralTask, TaskSection, TaskTag, TaskComment, User } from './types';
 import { getCurrentTimestamp } from './helpers';
 import { useAuth } from './auth-context';
 
 interface StoreContextType {
   loading: boolean;
+  users: User[];
   projects: Project[];
   members: Member[];
   matchings: Matching[];
@@ -66,6 +67,7 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [matchings, setMatchings] = useState<Matching[]>([]);
@@ -79,7 +81,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [proj, mem, match, logs, nt, tk, gt, ts, tt] = await Promise.all([
+        const [proj, mem, match, logs, nt, tk, gt, ts, tt, usrs] = await Promise.all([
           fetch('/api/projects').then(r => { if (!r.ok) throw new Error('projects'); return r.json(); }),
           fetch('/api/members').then(r => { if (!r.ok) throw new Error('members'); return r.json(); }),
           fetch('/api/matchings').then(r => { if (!r.ok) throw new Error('matchings'); return r.json(); }),
@@ -89,6 +91,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           fetch('/api/general-tasks').then(r => { if (!r.ok) throw new Error('general-tasks'); return r.json(); }),
           fetch('/api/task-sections').then(r => { if (!r.ok) throw new Error('task-sections'); return r.json(); }),
           fetch('/api/task-tags').then(r => { if (!r.ok) throw new Error('task-tags'); return r.json(); }),
+          fetch('/api/users').then(r => { if (!r.ok) throw new Error('users'); return r.json(); }),
         ]);
         setProjects(proj);
         setMembers(mem);
@@ -99,6 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setGeneralTasks(gt);
         setTaskSections(ts);
         setTaskTags(tt);
+        setUsers(usrs);
       } catch (e) {
         console.error('Failed to load initial data:', e);
       } finally {
@@ -557,7 +561,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      loading, projects, members, matchings, activityLogs, notes, tasks,
+      loading, users, projects, members, matchings, activityLogs, notes, tasks,
       addProject, updateProject, deleteProject, bulkUpdateProjects, bulkDeleteProjects,
       addMember, updateMember, deleteMember, bulkDeleteMembers,
       addMatching, updateMatching, deleteMatching, bulkDeleteMatchings,

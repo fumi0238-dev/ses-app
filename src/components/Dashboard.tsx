@@ -5,7 +5,7 @@ import { FaBriefcase, FaUsers, FaHandshake, FaCheckCircle, FaClock, FaChartBar, 
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Project, Member, Matching, ActivityLog } from '../lib/types';
-import { truncate, getActionIcon } from '../lib/helpers';
+import { truncate, getActionIcon, formatStructuredPrice } from '../lib/helpers';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -122,7 +122,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
                 : searchingMembers.map(m => (
                   <div key={m.id} className="recent-item" onClick={() => onShowMember(m.id)}>
                     <span className="recent-item-name">{m.full_name || m.initial} - {m.desired_position || '-'}</span>
-                    <span className="recent-item-meta">{m.desired_price || '-'}</span>
+                    <span className="recent-item-meta">{formatStructuredPrice(m.desired_price_min, m.desired_price_max) || m.desired_price || '-'}</span>
                   </div>
                 ))
               }
@@ -161,10 +161,14 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
               ? <div className="empty-state"><div className="empty-state-icon"><FaStream /></div><p>アクティビティがありません</p></div>
               : activityLogs.slice(0, 20).map(log => (
                 <div key={log.id} className="recent-item" style={{ cursor: 'default' }}>
-                  <span className="recent-item-name">
-                    {getActionIcon(log.action)} <strong>{log.action}</strong> {log.target_name || ''}
-                    {log.detail ? <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}> - {log.detail}</span> : ''}
-                    {log.user_name ? <span style={{ color: 'var(--text-secondary)', fontSize: 12, marginLeft: 8 }}>by {log.user_name}</span> : ''}
+                  <span className="recent-item-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {log.user_name && (
+                      <span className="activity-user-badge">{log.user_name}</span>
+                    )}
+                    <span>
+                      {getActionIcon(log.action)} <strong>{log.action}</strong> {log.target_name || ''}
+                      {log.detail ? <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}> - {log.detail}</span> : ''}
+                    </span>
                   </span>
                   <span className="recent-item-meta">{log.timestamp}</span>
                 </div>

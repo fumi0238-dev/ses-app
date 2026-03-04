@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { FaTimes, FaBriefcase, FaUsers, FaStickyNote, FaEdit, FaHandshake, FaSearch, FaPlus } from 'react-icons/fa';
 import { Project, Member, Matching, Note } from '../../lib/types';
-import { truncate, getMatchingBadgeClass, getProcessBadgeClass } from '../../lib/helpers';
+import { truncate, getMatchingBadgeClass, getProcessBadgeClass, getStructuredWorkStyle, formatStructuredPrice } from '../../lib/helpers';
 
 // ---- Notes Section ----
 interface NotesSectionProps {
@@ -145,11 +145,25 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
             <h4>条件面</h4>
             <div className="detail-grid">
               <div className="detail-item"><div className="detail-item-label">募集職種</div><div className="detail-item-value">{project.role || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">元単価</div><div className="detail-item-value">{project.client_price || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">仕入単価</div><div className="detail-item-value">{project.purchase_price || '-'}{project.purchase_price_num ? ` (${project.purchase_price_num}万円)` : ''}</div></div>
+              <div className="detail-item"><div className="detail-item-label">元単価</div><div className="detail-item-value">{formatStructuredPrice(project.client_price_min, project.client_price_max) || project.client_price || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">仕入単価</div><div className="detail-item-value">{formatStructuredPrice(project.purchase_price_min, project.purchase_price_max) || project.purchase_price || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">必要経験</div><div className="detail-item-value">{project.required_experience_years ? `${project.required_experience_years}年以上` : '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">勤務地</div><div className="detail-item-value">{project.location || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">働き方</div><div className="detail-item-value">{project.work_style || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">働き方</div><div className="detail-item-value">
+                {(() => {
+                  const ws = getStructuredWorkStyle(project.work_style_category, project.work_style_office_days, project.work_style_initial_onsite, project.work_style_note, project.work_style, project.work_style_transition_onsite);
+                  if (ws.category === 'unknown') return '-';
+                  return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={`badge work-style-badge ws-${ws.category}`}>{ws.categoryLabel}</span>
+                      {ws.officeDaysText && <span className="badge" style={{ fontSize: 11, background: '#e0e7ff', color: '#3730a3' }}>{ws.officeDaysText}</span>}
+                      {ws.initialOnsite && <span className="badge" style={{ fontSize: 11, background: '#fef3c7', color: '#92400e' }}>参画初期出社可</span>}
+                      {ws.transitionOnsite && <span className="badge" style={{ fontSize: 11, background: '#fef3c7', color: '#92400e' }}>過渡期出社可</span>}
+                      {ws.notes.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{ws.notes.join(' / ')}</span>}
+                    </span>
+                  );
+                })()}
+              </div></div>
               <div className="detail-item"><div className="detail-item-label">期間</div><div className="detail-item-value">{project.period || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">募集人数</div><div className="detail-item-value">{project.headcount || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">年齢制限</div><div className="detail-item-value">{project.age_limit || '-'}</div></div>
@@ -322,15 +336,36 @@ export function MemberDetailModal({ member, projects, matchings, notes, onClose,
             <h4>基本情報</h4>
             <div className="detail-grid">
               <div className="detail-item"><div className="detail-item-label">プロセス</div><div className="detail-item-value"><span className={`badge ${getProcessBadgeClass(member.process)}`}>{member.process}</span></div></div>
+              <div className="detail-item">
+                <div className="detail-item-label">共有可否</div>
+                <div className="detail-item-value">
+                  <span className={`badge badge-${(member.shareable || 'ok').toLowerCase()}`}>{member.shareable || '-'}</span>
+                  {member.share_note ? `（${member.share_note}）` : ''}
+                </div>
+              </div>
               <div className="detail-item"><div className="detail-item-label">所属先</div><div className="detail-item-value">{member.affiliation || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">本名</div><div className="detail-item-value">{member.full_name || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">イニシャル</div><div className="detail-item-value">{member.initial || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">希望単価</div><div className="detail-item-value">{member.desired_price || '-'}{member.desired_price_num ? ` (${member.desired_price_num}万円)` : ''}</div></div>
+              <div className="detail-item"><div className="detail-item-label">希望単価</div><div className="detail-item-value">{formatStructuredPrice(member.desired_price_min, member.desired_price_max) || member.desired_price || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">経験年数</div><div className="detail-item-value">{member.experience_years ? `${member.experience_years}年` : '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">希望ポジション</div><div className="detail-item-value">{member.desired_position || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">最寄駅</div><div className="detail-item-value">{member.nearest_station || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">稼働可能日</div><div className="detail-item-value">{member.available_date || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">勤務形態</div><div className="detail-item-value">{member.work_preference || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">勤務形態</div><div className="detail-item-value">
+                {(() => {
+                  const ws = getStructuredWorkStyle(member.work_style_category, member.work_style_office_days, member.work_style_initial_onsite, member.work_style_note, member.work_preference, member.work_style_transition_onsite);
+                  if (ws.category === 'unknown') return '-';
+                  return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={`badge work-style-badge ws-${ws.category}`}>{ws.categoryLabel}</span>
+                      {ws.officeDaysText && <span className="badge" style={{ fontSize: 11, background: '#e0e7ff', color: '#3730a3' }}>{ws.officeDaysText}</span>}
+                      {ws.initialOnsite && <span className="badge" style={{ fontSize: 11, background: '#fef3c7', color: '#92400e' }}>参画初期出社可</span>}
+                      {ws.transitionOnsite && <span className="badge" style={{ fontSize: 11, background: '#fef3c7', color: '#92400e' }}>過渡期出社可</span>}
+                      {ws.notes.length > 0 && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{ws.notes.join(' / ')}</span>}
+                    </span>
+                  );
+                })()}
+              </div></div>
               <div className="detail-item"><div className="detail-item-label">契約社員化</div><div className="detail-item-value">{member.contract_employee || '-'}</div></div>
               {member.skill_sheet_url && (
                 <div className="detail-item full-width">

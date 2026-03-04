@@ -1,5 +1,5 @@
 import { Project, Member, Matching } from './types';
-import { parseTags } from './helpers';
+import { parseTags, formatPriceRange, getStructuredPriceRange } from './helpers';
 
 const SKILL_GROUPS: string[][] = [
   ['java', 'kotlin', 'scala'],
@@ -38,6 +38,76 @@ const SKILL_GROUPS: string[][] = [
   ['セキュリティ', 'cybersecurity', '情報セキュリティ', 'isms'],
   ['ネットワーク', 'cisco', 'ccna', 'ccnp', 'firewall'],
 ];
+
+// --- 働き方の正規化・互換性スコア ---
+type WorkStyleCategory = 'remote' | 'hybrid' | 'onsite' | 'flexible' | 'unknown';
+
+function normalizeWorkStyle(text: string | undefined | null): WorkStyleCategory {
+  if (!text) return 'unknown';
+  const t = text.trim();
+  // ゴミデータ除外（単価情報など）
+  if (t.startsWith('■') || t.includes('万円')) return 'unknown';
+  if (/確認中/.test(t)) return 'unknown';
+  // フルリモート判定（「基本リモート」も含む）
+  if (/フルリモ|基本リモート|完全リモート|原則リモート/.test(t)) return 'remote';
+  // リモート併用判定
+  if (/リモート併用|リモート可|リモ併用/.test(t)) return 'hybrid';
+  // オンサイト／常駐／フル出社判定
+  if (/オンサイト|常駐|フル出社|出社必須/.test(t)) return 'onsite';
+  // 柔軟対応
+  if (/応相談|柔軟|相談可|対応可能/.test(t)) return 'flexible';
+  // 「出社」を含むがリモートも含む場合はhybrid
+  if (/出社/.test(t) && /リモート/.test(t)) return 'hybrid';
+  if (/出社/.test(t)) return 'onsite';
+  if (/リモート/.test(t)) return 'hybrid';
+  return 'unknown';
+}
+
+const WORK_STYLE_LABELS: Record<WorkStyleCategory, string> = {
+  remote: 'リモート',
+  hybrid: 'ハイブリッド',
+  onsite: 'オンサイト',
+  flexible: '柔軟',
+  unknown: '不明',
+};
+
+// 互換性マトリクス [案件の要件][要員の希望] → スコア加減
+const WORK_STYLE_COMPAT: Record<WorkStyleCategory, Record<WorkStyleCategory, number>> = {
+  remote:   { remote: 2, hybrid: 1, onsite: -1, flexible: 1, unknown: 0 },
+  hybrid:   { remote: 1, hybrid: 2, onsite: 1,  flexible: 2, unknown: 0 },
+  onsite:   { remote: -2, hybrid: 0, onsite: 2, flexible: 1, unknown: 0 },
+  flexible: { remote: 2, hybrid: 2, onsite: 1,  flexible: 2, unknown: 0 },
+  unknown:  { remote: 0, hybrid: 0, onsite: 0,  flexible: 0, unknown: 0 },
+};
+
+// 構造化カテゴリ（日本語）→ 内部カテゴリ
+function categoryToInternal(cat: string): WorkStyleCategory {
+  const map: Record<string, WorkStyleCategory> = {
+    'フルリモート': 'remote',
+    'リモート併用': 'hybrid',
+    'オンサイト': 'onsite',
+  };
+  return map[cat] || 'unknown';
+}
+
+function calcWorkStyleCompat(
+  projCategory: string | undefined,
+  projStyleText: string | undefined,
+  memCategory: string | undefined,
+  memPrefText: string | undefined
+): { score: number; note: string } {
+  // 構造化カテゴリ優先、なければ旧テキストからフォールバック
+  const pCat = projCategory ? categoryToInternal(projCategory) : normalizeWorkStyle(projStyleText);
+  const mCat = memCategory ? categoryToInternal(memCategory) : normalizeWorkStyle(memPrefText);
+  if (pCat === 'unknown' || mCat === 'unknown') return { score: 0, note: '' };
+  const score = WORK_STYLE_COMPAT[pCat][mCat];
+  const pLabel = WORK_STYLE_LABELS[pCat];
+  const mLabel = WORK_STYLE_LABELS[mCat];
+  if (score >= 2) return { score, note: `働き方◎ (${pLabel}↔${mLabel})` };
+  if (score >= 1) return { score, note: `働き方○ (${pLabel}↔${mLabel})` };
+  if (score <= -1) return { score, note: `働き方△ (案件:${pLabel} / 希望:${mLabel})` };
+  return { score, note: '' };
+}
 
 function findSimilarSkills(skill: string): string[] {
   const norm = skill.toLowerCase();
@@ -83,6 +153,7 @@ export interface MatchResult {
   priceNote: string;
   isExisting: boolean;
   reqCoverage: number | null;
+  workStyleNote: string;
 }
 
 export function doMatching(
@@ -94,7 +165,7 @@ export function doMatching(
   const prefTags = parseTags(project.preferred_skill_tags);
   const projIndustryTags = parseTags(project.industry_tags);
   const allProjectTags = [...reqTags, ...prefTags];
-  const projPriceNum = parseFloat(project.purchase_price_num) || 0;
+  const projPrice = getStructuredPriceRange(project.purchase_price_min, project.purchase_price_max, project.purchase_price);
   const projExpYears = parseFloat(project.required_experience_years) || 0;
 
   const existingMemberIds = matchings
@@ -104,7 +175,7 @@ export function doMatching(
   const scored: MatchResult[] = members.map(m => {
     const memberTags = parseTags(m.skill_tags);
     const memIndustryTags = parseTags(m.industry_tags);
-    const memPriceNum = parseFloat(m.desired_price_num) || 0;
+    const memPrice = getStructuredPriceRange(m.desired_price_min, m.desired_price_max, m.desired_price);
     const memExpYears = parseFloat(m.experience_years) || 0;
 
     let score = 0;
@@ -166,23 +237,36 @@ export function doMatching(
       }
     }
 
+    // 単価範囲ベースの比較
     let priceNote = '';
-    if (projPriceNum > 0 && memPriceNum > 0) {
-      const diff = projPriceNum - memPriceNum;
+    const projHasPrice = projPrice.min > 0 || projPrice.max > 0;
+    const memHasPrice = memPrice.min > 0 || memPrice.max > 0;
+    if (projHasPrice && memHasPrice) {
+      // 案件の上限(max) vs 要員の下限(min) で比較
+      const projTop = projPrice.max || projPrice.min; // maxが0なら min以上
+      const memBottom = memPrice.min || memPrice.max; // minが0なら max以下
+      const diff = projTop - memBottom;
       if (diff >= 10) {
         score += 1;
-        priceNote = `余裕+${diff}万`;
+        priceNote = `余裕+${diff}万 (${formatPriceRange(projPrice)}↔${formatPriceRange(memPrice)})`;
       } else if (diff >= 0) {
-        priceNote = `差${diff}万`;
+        priceNote = `差${diff}万 (${formatPriceRange(projPrice)}↔${formatPriceRange(memPrice)})`;
       } else {
         score -= 2;
-        penalties.push(`単価超過${Math.abs(diff)}万`);
+        penalties.push(`単価超過${Math.abs(diff)}万 (案件:${formatPriceRange(projPrice)} / 希望:${formatPriceRange(memPrice)})`);
         priceNote = `超過${Math.abs(diff)}万`;
       }
     }
 
     if (allProjectTags.length === 0 || memberTags.length === 0) {
       score += calcFallbackScore(project, m);
+    }
+
+    // 働き方互換性スコア（構造化カテゴリ優先、旧テキストフォールバック）
+    const wsCompat = calcWorkStyleCompat(project.work_style_category, project.work_style, m.work_style_category, m.work_preference);
+    score += wsCompat.score;
+    if (wsCompat.score <= -1) {
+      penalties.push(wsCompat.note);
     }
 
     const isExisting = existingMemberIds.includes(m.id);
@@ -194,7 +278,7 @@ export function doMatching(
         )
       : null;
 
-    return { member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage };
+    return { member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage, workStyleNote: wsCompat.note };
   }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
 
   return scored;

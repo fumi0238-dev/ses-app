@@ -5,9 +5,10 @@ import {
   FaSearch, FaPlus, FaFileImport, FaFileExport,
   FaEdit, FaTrash, FaYenSign, FaMapMarkerAlt,
   FaCalendar, FaUserTie, FaBriefcase, FaUsers, FaTimes,
+  FaShareAlt,
 } from 'react-icons/fa';
-import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess, MEMBER_REQUIRED_FIELDS } from '../lib/types';
-import { truncate, getProcessBadgeClass, getMatchingBadgeClass, getMissingFields } from '../lib/helpers';
+import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess, MEMBER_REQUIRED_FIELDS, SHAREABLE_VALUES } from '../lib/types';
+import { truncate, getProcessBadgeClass, getMatchingBadgeClass, getMissingFields, parseWorkStyleDetail, WORK_STYLE_FILTER_OPTIONS, formatStructuredPrice } from '../lib/helpers';
 
 interface Props {
   members: Member[];
@@ -31,11 +32,11 @@ export default function Members({
   const [filterProcess, setFilterProcess] = useState('');
   const [filterWorkPref, setFilterWorkPref] = useState('');
   const [filterAvailability, setFilterAvailability] = useState('');
+  const [filterShareable, setFilterShareable] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 動的にフィルタ選択肢を生成
   const processOptions = useMemo(() => [...new Set(members.map(m => m.process).filter(Boolean))].sort(), [members]);
-  const workPrefOptions = useMemo(() => [...new Set(members.map(m => m.work_preference).filter(Boolean))].sort(), [members]);
 
   const filtered = useMemo(() => {
     let list = [...members];
@@ -51,7 +52,14 @@ export default function Members({
       );
     }
     if (filterProcess) list = list.filter(m => m.process === filterProcess);
-    if (filterWorkPref) list = list.filter(m => m.work_preference === filterWorkPref);
+    if (filterWorkPref) {
+      list = list.filter(m => {
+        // 構造化カテゴリ優先、なければ旧テキストからフォールバック
+        if (m.work_style_category) return m.work_style_category === filterWorkPref;
+        const detail = parseWorkStyleDetail(m.work_preference);
+        return detail.categoryLabel === filterWorkPref;
+      });
+    }
     if (filterAvailability) {
       const now = new Date();
       if (filterAvailability === 'immediate') {
@@ -64,8 +72,11 @@ export default function Members({
         });
       }
     }
+    if (filterShareable) {
+      list = list.filter(m => m.shareable === filterShareable);
+    }
     return list;
-  }, [members, search, filterProcess, filterWorkPref, filterAvailability]);
+  }, [members, search, filterProcess, filterWorkPref, filterAvailability, filterShareable]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -106,17 +117,31 @@ export default function Members({
           </select>
           <select value={filterWorkPref} onChange={e => setFilterWorkPref(e.target.value)}>
             <option value="">勤務形態: すべて</option>
-            {workPrefOptions.map(w => <option key={w} value={w}>{w}</option>)}
+            {WORK_STYLE_FILTER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           <select value={filterAvailability} onChange={e => setFilterAvailability(e.target.value)}>
             <option value="">稼働時期: すべて</option>
             <option value="immediate">即日可能</option>
             <option value="thisMonth">今月中</option>
           </select>
+          <select value={filterShareable} onChange={e => setFilterShareable(e.target.value)}>
+            <option value="">共有: すべて</option>
+            {SHAREABLE_VALUES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
         <button className="btn btn-primary" onClick={onAdd}><FaPlus /> 要員追加</button>
         <button className="btn btn-secondary" onClick={onImport}><FaFileImport /> インポート</button>
         <button className="btn btn-secondary" onClick={onExport}><FaFileExport /> エクスポート</button>
+      </div>
+
+      {/* 件数表示 */}
+      <div className="count-bar">
+        <span className="count-bar-label">
+          {filtered.length === members.length
+            ? <>{members.length}件</>
+            : <>{filtered.length}<span className="count-bar-total"> / {members.length}</span>件</>
+          }
+        </span>
       </div>
 
       {selectedIds.size > 0 && (
@@ -153,8 +178,8 @@ export default function Members({
               ? m.skill_tags.split(',').map(s => s.trim()).filter(Boolean).slice(0, 8)
               : (m.skills_summary || '').split(/[,、/]/).slice(0, 6).map(s => s.trim()).filter(Boolean);
 
-            const activeMatchings = matchings
-              .filter(mt => mt.member_id === m.id && mt.status !== '見送り');
+            const allMatchings = matchings.filter(mt => mt.member_id === m.id);
+            const activeMatchings = allMatchings.filter(mt => mt.status !== '見送り');
 
             const matchingInfo = activeMatchings.map(mt => {
               const p = projects.find(x => x.id === mt.project_id);
@@ -163,6 +188,10 @@ export default function Members({
                 status: mt.status,
               };
             });
+
+            // 共有状況サマリー
+            const shareCount = allMatchings.filter(mt => mt.status !== '候補' && mt.status !== '見送り').length;
+            const decidedCount = allMatchings.filter(mt => mt.status === '参画決定').length;
 
             const missingLabels = getMissingFields(m, MEMBER_REQUIRED_FIELDS);
             const hasMissing = missingLabels.length > 0;
@@ -199,6 +228,15 @@ export default function Members({
                   <div>
                     <div className="member-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span>{m.full_name || m.initial}</span>
+                      {m.shareable && (
+                        <span
+                          className={`badge badge-${m.shareable.toLowerCase()}`}
+                          title={m.shareable === 'NG' && m.share_note ? `共有NG: ${m.share_note}` : `共有${m.shareable}`}
+                          style={{ fontSize: 10 }}
+                        >
+                          {m.shareable}
+                        </span>
+                      )}
                       {hasMissing && (
                         <span
                           className="badge badge-missing"
@@ -214,11 +252,30 @@ export default function Members({
                 </div>
 
                 <div className="member-meta">
-                  <div className="member-meta-item"><FaYenSign />{m.desired_price || '-'}</div>
+                  <div className="member-meta-item"><FaYenSign />{formatStructuredPrice(m.desired_price_min, m.desired_price_max) || m.desired_price || '-'}</div>
                   <div className="member-meta-item"><FaMapMarkerAlt />{m.nearest_station || '-'}</div>
                   <div className="member-meta-item"><FaCalendar />{m.available_date || '-'}</div>
                   <div className="member-meta-item"><FaUserTie />{m.desired_position || '-'}</div>
                 </div>
+
+                {/* 共有状況サマリー */}
+                {allMatchings.length > 0 && (
+                  <div className="member-share-summary">
+                    <FaShareAlt style={{ fontSize: 10, marginRight: 4, color: 'var(--text-secondary)' }} />
+                    {decidedCount > 0 && (
+                      <span className="badge badge-decided" style={{ fontSize: 10, marginRight: 4 }}>参画: {decidedCount}件</span>
+                    )}
+                    {shareCount > 0 && (
+                      <span className="badge badge-proposed" style={{ fontSize: 10, marginRight: 4 }}>提案中: {shareCount}件</span>
+                    )}
+                    {allMatchings.length > activeMatchings.length && (
+                      <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>見送り: {allMatchings.length - activeMatchings.length}件</span>
+                    )}
+                    {shareCount === 0 && decidedCount === 0 && (
+                      <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>候補: {activeMatchings.length}件</span>
+                    )}
+                  </div>
+                )}
 
                 {matchingInfo.length > 0 && (
                   <div className="member-matching-tags">

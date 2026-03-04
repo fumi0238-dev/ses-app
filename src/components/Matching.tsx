@@ -146,7 +146,7 @@ export default function MatchingPage({
               </div>
             ) : (
               <div className="matching-results">
-                {matchResults.map(({ member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage }) => (
+                {matchResults.map(({ member: m, score, matchedRequired, matchedPreferred, matchedSimilar, matchedIndustry, penalties, priceNote, isExisting, reqCoverage, workStyleNote }) => (
                   <div
                     key={m.id}
                     className="match-candidate"
@@ -203,6 +203,12 @@ export default function MatchingPage({
                       )}
                     </div>
 
+                    {workStyleNote && !penalties.some(p => p.includes('働き方')) && (
+                      <div style={{ fontSize: 11, marginTop: 4, color: workStyleNote.includes('◎') ? 'var(--success)' : workStyleNote.includes('○') ? 'var(--info)' : 'var(--text-secondary)' }}>
+                        🏠 {workStyleNote}
+                      </div>
+                    )}
+
                     {penalties.length > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
                         ⚠ {penalties.join(' / ')}
@@ -232,7 +238,10 @@ export default function MatchingPage({
 
       {/* Matching History */}
       <div className="card mt-20">
-        <div className="card-header"><h3><FaList /> マッチング履歴</h3></div>
+        <div className="card-header">
+          <h3><FaList /> マッチング履歴</h3>
+          <span className="count-bar-label" style={{ marginLeft: 12, fontSize: 13 }}>{matchings.length}件</span>
+        </div>
         <div className="card-body">
           <table className="data-table">
             <thead>

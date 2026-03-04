@@ -22,6 +22,17 @@ model Project {
   role                      String?
   location                  String?
   work_style                String?
+  // 構造化フィールド: 単価
+  client_price_min          Int?
+  client_price_max          Int?
+  purchase_price_min        Int?
+  purchase_price_max        Int?
+  // 構造化フィールド: 働き方
+  work_style_category       String?   // フルリモート/リモート併用/オンサイト
+  work_style_office_days    String?   // 週○日出社の○
+  work_style_initial_onsite    Boolean   @default(false)
+  work_style_transition_onsite Boolean   @default(false)
+  work_style_note           String?
   period                    String?
   headcount                 String?
   required_skills           String?
@@ -67,6 +78,18 @@ model Member {
   nearest_station    String?
   available_date     String?
   work_preference    String?
+  // 構造化フィールド: 共有可否
+  shareable                 String?
+  share_note                String?
+  // 構造化フィールド: 単価
+  desired_price_min         Int?
+  desired_price_max         Int?
+  // 構造化フィールド: 働き方
+  work_style_category       String?
+  work_style_office_days    String?
+  work_style_initial_onsite    Boolean   @default(false)
+  work_style_transition_onsite Boolean   @default(false)
+  work_style_note           String?
   created_at         BigInt     @default(0)
   updated_at         BigInt     @default(0)
   deleted            Boolean    @default(false)
@@ -82,7 +105,8 @@ model Matching {
   status         String?
   note           String?
   proposed_date  String?
-  interview_date String?
+  interview_date     String?
+  primary_assignee   String?
   created_at     BigInt  @default(0)
   updated_at     BigInt  @default(0)
   deleted        Boolean @default(false)

@@ -15,6 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         note: body.note,
         proposed_date: body.proposed_date,
         interview_date: body.interview_date,
+        primary_assignee: body.primary_assignee,
         updated_at: now,
       },
     });

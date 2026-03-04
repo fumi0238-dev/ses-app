@@ -5,14 +5,15 @@ import {
   FaSearch, FaEdit, FaTrash, FaTable, FaColumns, FaTimes, FaChevronDown, FaChevronRight,
   FaRegCalendarAlt,
 } from 'react-icons/fa';
-import { Project, Member, Matching, Task, TASK_PROGRESS_STATUSES, MATCHING_STATUSES } from '../lib/types';
-import { truncate, parseTags, getMatchingBadgeClass, getDefaultTasksForStatus, getTaskDueStatus } from '../lib/helpers';
+import { Project, Member, Matching, Task, User, TASK_PROGRESS_STATUSES, MATCHING_STATUSES } from '../lib/types';
+import { truncate, parseTags, getMatchingBadgeClass, getDefaultTasksForStatus, getTaskDueStatus, getStructuredPriceRange, formatPriceRange, formatStructuredPrice } from '../lib/helpers';
 
 interface Props {
   projects: Project[];
   members: Member[];
   matchings: Matching[];
   tasks: Task[];
+  users: User[];
   onQuickStatusUpdate: (id: string, status: string) => void;
   onEditMatching: (mt: Matching) => void;
   onDeleteMatching: (id: string) => void;
@@ -274,7 +275,7 @@ function TaskChecklist({
 
 /* -------- Main ProgressPage -------- */
 export default function ProgressPage({
-  projects, members, matchings, tasks,
+  projects, members, matchings, tasks, users,
   onQuickStatusUpdate, onEditMatching, onDeleteMatching, onBulkDeleteMatchings, onUpdateMatchingField, onShowProject, onShowMember,
   onAddTask, onUpdateTask, onDeleteTask, onBulkAddTasks,
 }: Props) {
@@ -323,10 +324,21 @@ export default function ProgressPage({
       const project = projects.find(p => p.id === mt.project_id);
       const member = members.find(m => m.id === mt.member_id);
 
-      // Price diff
-      const projPrice = parseFloat(project?.purchase_price_num || '0') || 0;
-      const memPrice = parseFloat(member?.desired_price_num || '0') || 0;
-      const priceDiff = projPrice > 0 && memPrice > 0 ? projPrice - memPrice : null;
+      // Price diff (構造化データ優先、フォールバック付き)
+      const projPriceRange = project
+        ? getStructuredPriceRange(project.purchase_price_min, project.purchase_price_max, project.purchase_price)
+        : { min: 0, max: 0 };
+      const memPriceRange = member
+        ? getStructuredPriceRange(member.desired_price_min, member.desired_price_max, member.desired_price)
+        : { min: 0, max: 0 };
+      const projHasPrice = projPriceRange.min > 0 || projPriceRange.max > 0;
+      const memHasPrice = memPriceRange.min > 0 || memPriceRange.max > 0;
+      const priceDiff = projHasPrice && memHasPrice
+        ? (projPriceRange.max || projPriceRange.min) - (memPriceRange.min || memPriceRange.max)
+        : null;
+      const priceLabel = projHasPrice && memHasPrice
+        ? `${formatPriceRange(projPriceRange)} ↔ ${formatPriceRange(memPriceRange)}`
+        : null;
 
       // Skill match
       const reqTags = parseTags(project?.required_skill_tags);
@@ -340,7 +352,7 @@ export default function ProgressPage({
       const matchingTasks = tasks.filter(t => t.matching_id === mt.id)
         .sort((a, b) => a.sort_order - b.sort_order);
 
-      return { matching: mt, project, member, priceDiff, matchedSkills, skillMatchRate, matchingTasks };
+      return { matching: mt, project, member, priceDiff, priceLabel, matchedSkills, skillMatchRate, matchingTasks };
     });
   }, [matchings, projects, members, tasks]);
 
@@ -394,10 +406,10 @@ export default function ProgressPage({
     }).length;
   }, []);
 
-  const renderPriceDiff = (diff: number | null) => {
+  const renderPriceDiff = (diff: number | null, label?: string | null) => {
     if (diff === null) return <span className="progress-price-diff neutral">-</span>;
     const cls = diff >= 0 ? 'positive' : 'negative';
-    return <span className={`progress-price-diff ${cls}`}>{diff >= 0 ? '+' : ''}{diff}万</span>;
+    return <span className={`progress-price-diff ${cls}`} title={label || undefined}>{diff >= 0 ? '+' : ''}{diff}万</span>;
   };
 
   const renderSkillMatch = (rate: number | null, skills: string[]) => {
@@ -510,6 +522,16 @@ export default function ProgressPage({
         </button>
       </div>
 
+      {/* 件数表示 */}
+      <div className="count-bar">
+        <span className="count-bar-label">
+          {filtered.length === enrichedMatchings.length
+            ? <>{enrichedMatchings.length}件</>
+            : <>{filtered.length}<span className="count-bar-total"> / {enrichedMatchings.length}</span>件</>
+          }
+        </span>
+      </div>
+
       {/* Status summary */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {MATCHING_STATUSES.map(s => {
@@ -554,6 +576,7 @@ export default function ProgressPage({
                 <th>希望単価</th>
                 <th>単価差</th>
                 <th>スキル一致</th>
+                <th>担当者</th>
                 <th>提案日</th>
                 <th>面談日</th>
                 <th>タスク</th>
@@ -563,8 +586,8 @@ export default function ProgressPage({
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={15} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>該当するマッチングがありません</td></tr>
-              ) : filtered.map(({ matching: mt, project, member, priceDiff, matchedSkills, skillMatchRate, matchingTasks }) => (
+                <tr><td colSpan={16} style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>該当するマッチングがありません</td></tr>
+              ) : filtered.map(({ matching: mt, project, member, priceDiff, priceLabel, matchedSkills, skillMatchRate, matchingTasks }) => (
                 <React.Fragment key={mt.id}>
                   <tr>
                     <td className="th-check">
@@ -589,7 +612,7 @@ export default function ProgressPage({
                     </td>
                     <td>{truncate(project?.role, 15)}</td>
                     <td>{truncate(project?.location, 10)}</td>
-                    <td>{project?.purchase_price || '-'}</td>
+                    <td>{formatStructuredPrice(project?.purchase_price_min, project?.purchase_price_max) || project?.purchase_price || '-'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <span
                         style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}
@@ -598,9 +621,20 @@ export default function ProgressPage({
                         {member ? (member.full_name || member.initial) : '-'}
                       </span>
                     </td>
-                    <td>{member?.desired_price || '-'}</td>
-                    <td>{renderPriceDiff(priceDiff)}</td>
+                    <td>{formatStructuredPrice(member?.desired_price_min, member?.desired_price_max) || member?.desired_price || '-'}</td>
+                    <td>{renderPriceDiff(priceDiff, priceLabel)}</td>
                     <td>{renderSkillMatch(skillMatchRate, matchedSkills)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <select
+                        className="inline-status-select"
+                        value={mt.primary_assignee || ''}
+                        onChange={e => onUpdateMatchingField(mt.id, { primary_assignee: e.target.value })}
+                        style={{ minWidth: 80, fontSize: 12 }}
+                      >
+                        <option value="">未設定</option>
+                        {users.map(u => <option key={u.id} value={u.display_name}>{u.display_name}</option>)}
+                      </select>
+                    </td>
                     <td>
                       {editingDateCell?.id === mt.id && editingDateCell?.field === 'proposed_date' ? (
                         <input
@@ -695,7 +729,7 @@ export default function ProgressPage({
                   </tr>
                   {expandedTable.has(mt.id) && (
                     <tr className="task-expand-row">
-                      <td colSpan={15}>
+                      <td colSpan={16}>
                         <div className="task-expand-content">
                           <div className="task-expand-header">
                             <span>ネクストアクション</span>
@@ -752,7 +786,7 @@ export default function ProgressPage({
                   <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)', fontSize: 12 }}>
                     {dragOverStatus === status ? 'ここにドロップ' : 'なし'}
                   </div>
-                ) : items.map(({ matching: mt, project, member, priceDiff, matchedSkills, skillMatchRate, matchingTasks }) => (
+                ) : items.map(({ matching: mt, project, member, priceDiff, priceLabel, matchedSkills, skillMatchRate, matchingTasks }) => (
                   <div
                     key={mt.id}
                     className={`kanban-card${draggedMatchingId === mt.id ? ' dragging' : ''}`}
@@ -776,14 +810,25 @@ export default function ProgressPage({
                     >
                       {member ? (member.full_name || member.initial) : '-'}
                     </div>
+                    <div style={{ marginBottom: 4 }}>
+                      <select
+                        className="inline-status-select"
+                        value={mt.primary_assignee || ''}
+                        onChange={e => onUpdateMatchingField(mt.id, { primary_assignee: e.target.value })}
+                        style={{ width: '100%', fontSize: 11 }}
+                      >
+                        <option value="">担当者: 未設定</option>
+                        {users.map(u => <option key={u.id} value={u.display_name}>{u.display_name}</option>)}
+                      </select>
+                    </div>
                     <div className="kanban-card-meta">
                       <div className="kanban-card-meta-row">
-                        <span>仕入: {project?.purchase_price || '-'}</span>
-                        <span>希望: {member?.desired_price || '-'}</span>
+                        <span>仕入: {formatStructuredPrice(project?.purchase_price_min, project?.purchase_price_max) || project?.purchase_price || '-'}</span>
+                        <span>希望: {formatStructuredPrice(member?.desired_price_min, member?.desired_price_max) || member?.desired_price || '-'}</span>
                       </div>
                       {priceDiff !== null && (
                         <div className="kanban-card-meta-row">
-                          {renderPriceDiff(priceDiff)}
+                          {renderPriceDiff(priceDiff, priceLabel)}
                         </div>
                       )}
                       {mt.proposed_date && <span>提案: {mt.proposed_date}</span>}

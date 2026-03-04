@@ -36,6 +36,15 @@ export interface Project {
   role: string;
   location: string;
   work_style: string;
+  client_price_min: string;
+  client_price_max: string;
+  purchase_price_min: string;
+  purchase_price_max: string;
+  work_style_category: string;
+  work_style_office_days: string;
+  work_style_initial_onsite: string;
+  work_style_transition_onsite: string;
+  work_style_note: string;
   period: string;
   headcount: string;
   required_skills: string;
@@ -74,7 +83,19 @@ export interface Member {
   nearest_station: string;
   available_date: string;
   work_preference: string;
+  shareable: string;
+  share_note: string;
+  desired_price_min: string;
+  desired_price_max: string;
+  work_style_category: string;
+  work_style_office_days: string;
+  work_style_initial_onsite: string;
+  work_style_transition_onsite: string;
+  work_style_note: string;
 }
+
+export const WORK_STYLE_CATEGORIES = ['フルリモート', 'リモート併用', 'オンサイト'] as const;
+export type WorkStyleCategoryValue = typeof WORK_STYLE_CATEGORIES[number];
 
 export interface Matching {
   id: string;
@@ -84,6 +105,7 @@ export interface Matching {
   note: string;
   proposed_date: string;
   interview_date: string;
+  primary_assignee: string;
 }
 
 export interface ActivityLog {

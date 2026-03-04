@@ -420,6 +420,7 @@ function AuthenticatedApp() {
             members={store.members}
             matchings={store.matchings}
             tasks={store.tasks}
+            users={store.users}
             onQuickStatusUpdate={handleQuickStatusUpdate}
             onEditMatching={handleEditMatching}
             onDeleteMatching={handleDeleteMatching}

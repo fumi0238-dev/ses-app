@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
         note: body.note ?? '',
         proposed_date: body.proposed_date ?? '',
         interview_date: body.interview_date ?? '',
+        primary_assignee: body.primary_assignee ?? '',
         created_at: now,
         updated_at: now,
       },
