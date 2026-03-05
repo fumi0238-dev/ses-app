@@ -1072,7 +1072,8 @@ select.process-select:focus {
     line-height: 1;
 }
 .tag-item .tag-remove:hover { opacity: 1; color: var(--danger); }
-.tag-input {
+.tag-input,
+.form-group .tag-input {
     border: none;
     outline: none;
     font-size: 13px;
@@ -1081,6 +1082,7 @@ select.process-select:focus {
     min-width: 100px;
     padding: 2px 4px;
     background: transparent;
+    box-shadow: none;
 }
 .tag-hint {
     font-weight: 400;
@@ -1487,7 +1489,7 @@ select.process-select:focus {
     gap: 4px;
     padding: 3px 10px;
     border-radius: 20px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     border: 1px solid var(--border);
@@ -1495,6 +1497,7 @@ select.process-select:focus {
     transition: all 0.2s;
     white-space: nowrap;
     min-width: 50px;
+    min-height: 26px;
     justify-content: center;
 }
 .task-badge-btn:hover {

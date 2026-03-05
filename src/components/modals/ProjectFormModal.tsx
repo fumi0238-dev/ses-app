@@ -30,7 +30,11 @@ export default function ProjectFormModal({ initial, onClose, onSave }: Props) {
 
   useEffect(() => {
     if (initial) {
-      setForm({ ...EMPTY, ...initial });
+      // null→空文字変換（inputのvalue=nullによるReact警告を防止）
+      const sanitized = Object.fromEntries(
+        Object.entries(initial).map(([k, v]) => [k, v ?? ''])
+      );
+      setForm({ ...EMPTY, ...sanitized });
     } else {
       setForm(EMPTY);
     }

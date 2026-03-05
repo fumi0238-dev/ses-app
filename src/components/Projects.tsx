@@ -208,7 +208,10 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
               <th>募集職種</th>
               <th>勤務地</th>
               <th>働き方</th>
+              <th>出社頻度</th>
+              <th>期間</th>
               <th className="sortable" onClick={() => handleSort('purchase_price_num')}>仕入単価 <SortIcon field="purchase_price_num" sortField={sortField} sortDir={sortDir} /></th>
+              <th>元単価</th>
               <th>案件元</th>
               <th className="sortable" onClick={() => handleSort('match_count')}>提案 <SortIcon field="match_count" sortField={sortField} sortDir={sortDir} /></th>
               <th>操作</th>
@@ -216,7 +219,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={12} className="empty-state"><h3>該当する案件がありません</h3><p>検索条件を変更するか、新しい案件を追加してください</p></td></tr>
+              <tr><td colSpan={15} className="empty-state"><h3>該当する案件がありません</h3><p>検索条件を変更するか、新しい案件を追加してください</p></td></tr>
             ) : filtered.map(p => {
               const matchCount = matchings.filter(mt => mt.project_id === p.id).length;
               const missingLabels = getMissingFields(p, PROJECT_REQUIRED_FIELDS);
@@ -262,10 +265,11 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                   </td>
                   <td>{truncate(p.role, 20)}</td>
                   <td>{p.location || '-'}</td>
-                  <td>{p.work_style_category
-                    ? `${p.work_style_category}${p.work_style_office_days ? `（週${p.work_style_office_days}日）` : ''}`
-                    : p.work_style || '-'}</td>
+                  <td>{p.work_style_category || p.work_style || '-'}</td>
+                  <td>{p.work_style_office_days ? `週${p.work_style_office_days}日` : '-'}</td>
+                  <td>{p.period || '-'}</td>
                   <td>{formatStructuredPrice(p.purchase_price_min, p.purchase_price_max) || p.purchase_price || '-'}</td>
+                  <td>{formatStructuredPrice(p.client_price_min, p.client_price_max) || p.client_price || '-'}</td>
                   <td>{truncate(p.source, 15)}</td>
                   <td>
                     {matchCount > 0

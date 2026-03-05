@@ -28,8 +28,15 @@ export default function MemberFormModal({ initial, onClose, onSave }: Props) {
   const isEdit = !!(initial && (initial as Member).id);
 
   useEffect(() => {
-    if (initial) setForm({ ...EMPTY, ...initial });
-    else setForm(EMPTY);
+    if (initial) {
+      // null→空文字変換（inputのvalue=nullによるReact警告を防止）
+      const sanitized = Object.fromEntries(
+        Object.entries(initial).map(([k, v]) => [k, v ?? ''])
+      );
+      setForm({ ...EMPTY, ...sanitized });
+    } else {
+      setForm(EMPTY);
+    }
   }, [initial]);
 
   const set = (field: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
