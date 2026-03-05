@@ -124,7 +124,7 @@ export default function ProjectFormModal({ initial, onClose, onSave }: Props) {
                   {WORK_STYLE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              {form.work_style_category === 'リモート併用' && (
+              {(form.work_style_category === 'リモート併用' || form.work_style_category === 'オンサイト') && (
                 <div className="form-group">
                   <label>出社日数（週）</label>
                   <input type="text" value={form.work_style_office_days} onChange={set('work_style_office_days')} placeholder="例: 2～3" />
