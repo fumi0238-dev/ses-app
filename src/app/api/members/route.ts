@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         experience_summary: body.experience_summary ?? '',
         nearest_station: body.nearest_station ?? '',
         available_date: body.available_date ?? '',
+        available_immediately: body.available_immediately ?? false,
         work_preference: body.work_preference ?? '',
         shareable: body.shareable ?? '',
         share_note: body.share_note ?? '',

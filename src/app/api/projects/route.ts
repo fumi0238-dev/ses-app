@@ -64,6 +64,8 @@ export async function POST(req: NextRequest) {
         work_style_initial_onsite: body.work_style_initial_onsite ?? false,
         work_style_transition_onsite: body.work_style_transition_onsite ?? false,
         work_style_note: body.work_style_note ?? null,
+        period_start: body.period_start ?? null,
+        period_end: body.period_end ?? null,
         created_at: now,
         updated_at: now,
       },

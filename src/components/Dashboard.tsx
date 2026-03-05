@@ -5,7 +5,7 @@ import { FaBriefcase, FaUsers, FaHandshake, FaCheckCircle, FaClock, FaChartBar, 
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Project, Member, Matching, ActivityLog } from '../lib/types';
-import { truncate, getActionIcon, formatStructuredPrice } from '../lib/helpers';
+import { truncate, getActionIcon, formatStructuredPrice, formatDateStr } from '../lib/helpers';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -104,7 +104,7 @@ export default function Dashboard({ projects, members, matchings, activityLogs, 
                 : recentProjects.map(p => (
                   <div key={p.id} className="recent-item" onClick={() => onShowProject(p.id)}>
                     <span className="recent-item-name">{truncate(p.project_name_rewrite || p.project_name_original, 40)}</span>
-                    <span className="recent-item-meta">{p.added_date || '-'}</span>
+                    <span className="recent-item-meta">{formatDateStr(p.added_date)}</span>
                   </div>
                 ))
               }

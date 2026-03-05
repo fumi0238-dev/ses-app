@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { FaSearch, FaPlus, FaFileImport, FaFileExport, FaEdit, FaTrash, FaSort, FaSortUp, FaSortDown, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
 import { Project, Matching, PROJECT_STATUSES, SHAREABLE_VALUES, PROJECT_REQUIRED_FIELDS } from '../lib/types';
-import { truncate, getMissingFields, formatStructuredPrice } from '../lib/helpers';
+import { truncate, getMissingFields, formatStructuredPrice, formatDateStr, formatPeriodRange } from '../lib/helpers';
 
 /** 案件がOpen状態で指定日数以上経過しているか判定 */
 function getDaysOpen(project: Project): number | null {
@@ -231,7 +231,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                   </td>
                   <td><span className={`badge badge-${(p.status || 'open').toLowerCase()}`}>{p.status}</span></td>
                   <td><span className={`badge badge-${(p.shareable || 'ok').toLowerCase()}`}>{p.shareable}</span></td>
-                  <td>{p.added_date || '-'}</td>
+                  <td>{formatDateStr(p.added_date)}</td>
                   <td>
                     <a href="#" style={{ color: 'var(--primary)', fontWeight: 500 }} onClick={e => { e.preventDefault(); onDetail(p.id); }}>
                       {truncate(p.project_name_rewrite || p.project_name_original, 30)}
@@ -267,7 +267,7 @@ export default function Projects({ projects, matchings, onAdd, onEdit, onDelete,
                   <td>{p.location || '-'}</td>
                   <td>{p.work_style_category || p.work_style || '-'}</td>
                   <td>{p.work_style_office_days ? `週${p.work_style_office_days}日` : '-'}</td>
-                  <td>{p.period || '-'}</td>
+                  <td>{formatPeriodRange(p.period_start, p.period_end, p.period)}</td>
                   <td>{formatStructuredPrice(p.purchase_price_min, p.purchase_price_max) || p.purchase_price || '-'}</td>
                   <td>{formatStructuredPrice(p.client_price_min, p.client_price_max) || p.client_price || '-'}</td>
                   <td>{truncate(p.source, 15)}</td>

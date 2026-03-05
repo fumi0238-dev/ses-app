@@ -46,6 +46,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         work_style_initial_onsite: body.work_style_initial_onsite !== undefined ? body.work_style_initial_onsite : undefined,
         work_style_transition_onsite: body.work_style_transition_onsite !== undefined ? body.work_style_transition_onsite : undefined,
         work_style_note: body.work_style_note !== undefined ? body.work_style_note : undefined,
+        period_start: body.period_start !== undefined ? (body.period_start || null) : undefined,
+        period_end: body.period_end !== undefined ? (body.period_end || null) : undefined,
         updated_at: now,
       },
     });

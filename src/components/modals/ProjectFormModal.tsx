@@ -18,7 +18,7 @@ const EMPTY: Omit<Project, 'id'> = {
   client_price_min: '', client_price_max: '', purchase_price_min: '', purchase_price_max: '',
   work_style_category: '', work_style_office_days: '', work_style_initial_onsite: '',
   work_style_transition_onsite: '', work_style_note: '',
-  period: '', headcount: '', required_skills: '', preferred_skills: '',
+  period: '', period_start: '', period_end: '', headcount: '', required_skills: '', preferred_skills: '',
   required_skill_tags: '', preferred_skill_tags: '', industry_tags: '',
   description_original: '', description_rewrite: '', age_limit: '', nationality: '',
   english: '', commercial_flow: '', interview_count: '',
@@ -156,9 +156,23 @@ export default function ProjectFormModal({ initial, onClose, onSave }: Props) {
                 <label>働き方備考</label>
                 <input type="text" value={form.work_style_note} onChange={set('work_style_note')} placeholder="補足事項..." />
               </div>
-              <div className="form-group">
+              <div className="form-group full-width">
                 <label>期間</label>
-                <input type="text" value={form.period} onChange={set('period')} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="date"
+                    value={(form.period_start || '').replace(/\//g, '-')}
+                    onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ color: 'var(--text-secondary)' }}>～</span>
+                  <input
+                    type="date"
+                    value={(form.period_end || '').replace(/\//g, '-')}
+                    onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
+                    style={{ flex: 1 }}
+                  />
+                </div>
               </div>
               <div className="form-group">
                 <label>募集人数</label>

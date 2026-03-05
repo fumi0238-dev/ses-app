@@ -6,7 +6,7 @@ import {
   FaRegCalendarAlt,
 } from 'react-icons/fa';
 import { Project, Member, Matching, Task, User, TASK_PROGRESS_STATUSES, MATCHING_STATUSES } from '../lib/types';
-import { truncate, parseTags, getMatchingBadgeClass, getDefaultTasksForStatus, getTaskDueStatus, getStructuredPriceRange, formatPriceRange, formatStructuredPrice } from '../lib/helpers';
+import { truncate, parseTags, getMatchingBadgeClass, getDefaultTasksForStatus, getTaskDueStatus, getStructuredPriceRange, formatPriceRange, formatStructuredPrice, formatDateStr } from '../lib/helpers';
 
 interface Props {
   projects: Project[];
@@ -651,7 +651,7 @@ export default function ProgressPage({
                           onClick={() => setEditingDateCell({ id: mt.id, field: 'proposed_date' })}
                           title="クリックで日付選択"
                         >
-                          {mt.proposed_date || <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
+                          {mt.proposed_date ? formatDateStr(mt.proposed_date) : <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
                         </span>
                       )}
                     </td>
@@ -671,7 +671,7 @@ export default function ProgressPage({
                           onClick={() => setEditingDateCell({ id: mt.id, field: 'interview_date' })}
                           title="クリックで日付選択"
                         >
-                          {mt.interview_date || <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
+                          {mt.interview_date ? formatDateStr(mt.interview_date) : <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
                         </span>
                       )}
                     </td>

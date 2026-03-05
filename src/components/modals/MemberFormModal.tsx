@@ -16,7 +16,7 @@ const EMPTY: Omit<Member, 'id'> = {
   desired_price: '', desired_price_num: '', contact: '', desired_position: '',
   skill_sheet_url: '', proposal_text: '', sales_comment: '', skills_summary: '',
   skill_tags: '', industry_tags: '', experience_years: '', experience_summary: '',
-  nearest_station: '', available_date: '', work_preference: '',
+  nearest_station: '', available_date: '', available_immediately: '', work_preference: '',
   shareable: 'OK', share_note: '',
   desired_price_min: '', desired_price_max: '',
   work_style_category: '', work_style_office_days: '', work_style_initial_onsite: '',
@@ -123,7 +123,23 @@ export default function MemberFormModal({ initial, onClose, onSave }: Props) {
               </div>
               <div className="form-group">
                 <label>稼働可能日</label>
-                <input type="text" value={form.available_date} onChange={set('available_date')} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.available_immediately === true || form.available_immediately === 'true'}
+                      onChange={e => setForm(f => ({ ...f, available_immediately: e.target.checked ? 'true' : '' }))}
+                    />
+                    即日可
+                  </label>
+                  <input
+                    type="date"
+                    value={(form.available_date || '').replace(/\//g, '-')}
+                    onChange={e => setForm(f => ({ ...f, available_date: e.target.value }))}
+                    disabled={form.available_immediately === true || form.available_immediately === 'true'}
+                    style={{ flex: 1, opacity: (form.available_immediately === true || form.available_immediately === 'true') ? 0.4 : 1 }}
+                  />
+                </div>
               </div>
               <div className="form-group">
                 <label>勤務形態希望</label>

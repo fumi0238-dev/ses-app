@@ -8,7 +8,7 @@ import {
   FaShareAlt,
 } from 'react-icons/fa';
 import { Member, Matching, Project, MEMBER_PROCESSES, MemberProcess, MEMBER_REQUIRED_FIELDS, SHAREABLE_VALUES } from '../lib/types';
-import { truncate, getProcessBadgeClass, getMatchingBadgeClass, getMissingFields, parseWorkStyleDetail, WORK_STYLE_FILTER_OPTIONS, formatStructuredPrice } from '../lib/helpers';
+import { truncate, getProcessBadgeClass, getMatchingBadgeClass, getMissingFields, parseWorkStyleDetail, WORK_STYLE_FILTER_OPTIONS, formatStructuredPrice, formatAvailableDate } from '../lib/helpers';
 
 interface Props {
   members: Member[];
@@ -254,7 +254,7 @@ export default function Members({
                 <div className="member-meta">
                   <div className="member-meta-item"><FaYenSign />{formatStructuredPrice(m.desired_price_min, m.desired_price_max) || m.desired_price || '-'}</div>
                   <div className="member-meta-item"><FaMapMarkerAlt />{m.nearest_station || '-'}</div>
-                  <div className="member-meta-item"><FaCalendar />{m.available_date || '-'}</div>
+                  <div className="member-meta-item"><FaCalendar />{formatAvailableDate(m.available_immediately, m.available_date)}</div>
                   <div className="member-meta-item"><FaUserTie />{m.desired_position || '-'}</div>
                 </div>
 

@@ -6,7 +6,7 @@ import {
   FaEdit, FaTrash, FaEye, FaPlus, FaRegCalendarAlt,
 } from 'react-icons/fa';
 import { Project, Member, Matching, MATCHING_STATUSES } from '../lib/types';
-import { truncate, getMatchingBadgeClass } from '../lib/helpers';
+import { truncate, getMatchingBadgeClass, formatDateStr } from '../lib/helpers';
 import { doMatching } from '../lib/matching';
 
 interface Props {
@@ -290,7 +290,7 @@ export default function MatchingPage({
                           onClick={() => setEditingDateCell({ id: mt.id, field: 'proposed_date' })}
                           title="クリックで日付選択"
                         >
-                          {mt.proposed_date || <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
+                          {mt.proposed_date ? formatDateStr(mt.proposed_date) : <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
                         </span>
                       )}
                     </td>
@@ -310,7 +310,7 @@ export default function MatchingPage({
                           onClick={() => setEditingDateCell({ id: mt.id, field: 'interview_date' })}
                           title="クリックで日付選択"
                         >
-                          {mt.interview_date || <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
+                          {mt.interview_date ? formatDateStr(mt.interview_date) : <FaRegCalendarAlt style={{ opacity: 0.4, fontSize: 12 }} />}
                         </span>
                       )}
                     </td>

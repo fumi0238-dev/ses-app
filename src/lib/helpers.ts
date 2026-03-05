@@ -6,11 +6,36 @@ export function truncate(str: string | undefined | null, len: number): string {
 }
 
 export function formatDate(date: Date): string {
-  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+  return `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, '0')}月${String(date.getDate()).padStart(2, '0')}日`;
 }
 
 export function formatDateTime(date: Date): string {
   return `${formatDate(date)} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** 日付文字列を「YYYY年MM月DD日」形式に変換。パース不能ならそのまま返す */
+export function formatDateStr(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  // YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD 等をパース
+  const m = dateStr.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (m) return `${m[1]}年${m[2].padStart(2, '0')}月${m[3].padStart(2, '0')}日`;
+  return dateStr;
+}
+
+/** 期間（開始日～終了日）をフォーマット。構造化データ優先、なければ旧テキスト */
+export function formatPeriodRange(start: string | null | undefined, end: string | null | undefined, fallback?: string): string {
+  if (start) {
+    const s = formatDateStr(start);
+    if (end) return `${s}～${formatDateStr(end)}`;
+    return `${s}～`;
+  }
+  return fallback || '-';
+}
+
+/** 稼働可能日をフォーマット（即日可チェック対応） */
+export function formatAvailableDate(available_immediately: boolean | string | null | undefined, available_date: string | null | undefined): string {
+  if (available_immediately === true || available_immediately === 'true' || available_immediately === '1') return '即日';
+  return formatDateStr(available_date);
 }
 
 export function formatDateForFile(date: Date = new Date()): string {

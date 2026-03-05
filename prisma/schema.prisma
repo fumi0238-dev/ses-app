@@ -34,6 +34,9 @@ model Project {
   work_style_transition_onsite Boolean   @default(false)
   work_style_note           String?
   period                    String?
+  // 構造化フィールド: 期間
+  period_start              String?
+  period_end                String?
   headcount                 String?
   required_skills           String?
   preferred_skills          String?
@@ -77,6 +80,7 @@ model Member {
   experience_summary String?
   nearest_station    String?
   available_date     String?
+  available_immediately  Boolean   @default(false)
   work_preference    String?
   // 構造化フィールド: 共有可否
   shareable                 String?

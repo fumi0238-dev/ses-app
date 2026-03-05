@@ -46,6 +46,8 @@ export interface Project {
   work_style_transition_onsite: string;
   work_style_note: string;
   period: string;
+  period_start: string;
+  period_end: string;
   headcount: string;
   required_skills: string;
   preferred_skills: string;
@@ -82,6 +84,7 @@ export interface Member {
   experience_summary: string;
   nearest_station: string;
   available_date: string;
+  available_immediately: string;
   work_preference: string;
   shareable: string;
   share_note: string;

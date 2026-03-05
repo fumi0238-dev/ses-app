@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { FaTimes, FaBriefcase, FaUsers, FaStickyNote, FaEdit, FaHandshake, FaSearch, FaPlus } from 'react-icons/fa';
 import { Project, Member, Matching, Note } from '../../lib/types';
-import { truncate, getMatchingBadgeClass, getProcessBadgeClass, getStructuredWorkStyle, formatStructuredPrice } from '../../lib/helpers';
+import { truncate, getMatchingBadgeClass, getProcessBadgeClass, getStructuredWorkStyle, formatStructuredPrice, formatDateStr, formatPeriodRange, formatAvailableDate } from '../../lib/helpers';
 
 // ---- Notes Section ----
 interface NotesSectionProps {
@@ -135,7 +135,7 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
                   {project.share_note ? `（${project.share_note}）` : ''}
                 </div>
               </div>
-              <div className="detail-item"><div className="detail-item-label">追加日</div><div className="detail-item-value">{project.added_date || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">追加日</div><div className="detail-item-value">{formatDateStr(project.added_date)}</div></div>
               <div className="detail-item"><div className="detail-item-label">案件元</div><div className="detail-item-value">{project.source || '-'}</div></div>
               <div className="detail-item full-width"><div className="detail-item-label">案件名（原文）</div><div className="detail-item-value">{project.project_name_original || '-'}</div></div>
               <div className="detail-item full-width"><div className="detail-item-label">案件名（リライト）</div><div className="detail-item-value">{project.project_name_rewrite || '-'}</div></div>
@@ -164,7 +164,7 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
                   );
                 })()}
               </div></div>
-              <div className="detail-item"><div className="detail-item-label">期間</div><div className="detail-item-value">{project.period || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">期間</div><div className="detail-item-value">{formatPeriodRange(project.period_start, project.period_end, project.period)}</div></div>
               <div className="detail-item"><div className="detail-item-label">募集人数</div><div className="detail-item-value">{project.headcount || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">年齢制限</div><div className="detail-item-value">{project.age_limit || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">外国籍</div><div className="detail-item-value">{project.nationality || '-'}</div></div>
@@ -264,8 +264,8 @@ export function ProjectDetailModal({ project, members, matchings, notes, onClose
                       <tr key={mt.id}>
                         <td>{m ? (m.full_name || m.initial) : '-'}</td>
                         <td><span className={`badge ${getMatchingBadgeClass(mt.status)}`}>{mt.status}</span></td>
-                        <td>{mt.proposed_date || '-'}</td>
-                        <td>{mt.interview_date || '-'}</td>
+                        <td>{formatDateStr(mt.proposed_date)}</td>
+                        <td>{formatDateStr(mt.interview_date)}</td>
                         <td>{truncate(mt.note, 30)}</td>
                       </tr>
                     );
@@ -350,7 +350,7 @@ export function MemberDetailModal({ member, projects, matchings, notes, onClose,
               <div className="detail-item"><div className="detail-item-label">経験年数</div><div className="detail-item-value">{member.experience_years ? `${member.experience_years}年` : '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">希望ポジション</div><div className="detail-item-value">{member.desired_position || '-'}</div></div>
               <div className="detail-item"><div className="detail-item-label">最寄駅</div><div className="detail-item-value">{member.nearest_station || '-'}</div></div>
-              <div className="detail-item"><div className="detail-item-label">稼働可能日</div><div className="detail-item-value">{member.available_date || '-'}</div></div>
+              <div className="detail-item"><div className="detail-item-label">稼働可能日</div><div className="detail-item-value">{formatAvailableDate(member.available_immediately, member.available_date)}</div></div>
               <div className="detail-item"><div className="detail-item-label">勤務形態</div><div className="detail-item-value">
                 {(() => {
                   const ws = getStructuredWorkStyle(member.work_style_category, member.work_style_office_days, member.work_style_initial_onsite, member.work_style_note, member.work_preference, member.work_style_transition_onsite);
@@ -460,8 +460,8 @@ export function MemberDetailModal({ member, projects, matchings, notes, onClose,
                       <tr key={mt.id}>
                         <td>{p ? truncate(p.project_name_rewrite || p.project_name_original, 30) : '-'}</td>
                         <td><span className={`badge ${getMatchingBadgeClass(mt.status)}`}>{mt.status}</span></td>
-                        <td>{mt.proposed_date || '-'}</td>
-                        <td>{mt.interview_date || '-'}</td>
+                        <td>{formatDateStr(mt.proposed_date)}</td>
+                        <td>{formatDateStr(mt.interview_date)}</td>
                         <td>{truncate(mt.note, 30)}</td>
                       </tr>
                     );
