@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { Matching, Project, Member, MATCHING_STATUSES, MatchingStatus } from '../../lib/types';
 
@@ -14,6 +14,8 @@ interface MatchingFormData {
   note: string;
 }
 
+const DEFAULT_FORM: MatchingFormData = { project_id: '', member_id: '', status: '候補', proposed_date: '', interview_date: '', note: '' };
+
 interface Props {
   initial: MatchingFormData | null;
   projects: Project[];
@@ -24,12 +26,12 @@ interface Props {
 
 
 export default function MatchingFormModal({ initial, projects, members, onClose, onSave }: Props) {
-  const [form, setForm] = useState<MatchingFormData>({ project_id: '', member_id: '', status: '候補', proposed_date: '', interview_date: '', note: '' });
-
-  useEffect(() => {
-    if (initial) setForm(initial);
-    else setForm({ project_id: '', member_id: '', status: '候補', proposed_date: '', interview_date: '', note: '' });
-  }, [initial]);
+  const [form, setForm] = useState<MatchingFormData>(initial ?? DEFAULT_FORM);
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setForm(initial ?? DEFAULT_FORM);
+  }
 
   const projectLabel = projects.find(p => p.id === form.project_id);
   const memberLabel = members.find(m => m.id === form.member_id);

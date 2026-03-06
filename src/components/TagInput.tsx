@@ -35,7 +35,7 @@ export default function TagInput({ value, onChange, placeholder }: TagInputProps
     }
   };
 
-  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (_e: ClipboardEvent<HTMLInputElement>) => {
     setTimeout(() => {
       const input = inputRef.current!;
       const parts = input.value.split(/[,、/]+/).map(s => s.trim()).filter(Boolean);

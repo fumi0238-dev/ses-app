@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import TagInput from '../TagInput';
 import { Project, PROJECT_STATUSES, SHAREABLE_VALUES, WORK_STYLE_CATEGORIES } from '../../lib/types';
@@ -24,21 +24,23 @@ const EMPTY: Omit<Project, 'id'> = {
   english: '', commercial_flow: '', interview_count: '',
 };
 
+function sanitizeInitial(initial: Partial<Project>): Omit<Project, 'id'> {
+  // null→空文字変換（inputのvalue=nullによるReact警告を防止）
+  const sanitized = Object.fromEntries(
+    Object.entries(initial).map(([k, v]) => [k, v ?? ''])
+  );
+  return { ...EMPTY, ...sanitized };
+}
+
 export default function ProjectFormModal({ initial, onClose, onSave }: Props) {
-  const [form, setForm] = useState<Omit<Project, 'id'>>(EMPTY);
+  const [form, setForm] = useState<Omit<Project, 'id'>>(initial ? sanitizeInitial(initial) : EMPTY);
+  const [prevInitial, setPrevInitial] = useState(initial);
   const isEdit = !!(initial && (initial as Project).id);
 
-  useEffect(() => {
-    if (initial) {
-      // null→空文字変換（inputのvalue=nullによるReact警告を防止）
-      const sanitized = Object.fromEntries(
-        Object.entries(initial).map(([k, v]) => [k, v ?? ''])
-      );
-      setForm({ ...EMPTY, ...sanitized });
-    } else {
-      setForm(EMPTY);
-    }
-  }, [initial]);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setForm(initial ? sanitizeInitial(initial) : EMPTY);
+  }
 
   const set = (field: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));

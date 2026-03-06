@@ -6,9 +6,7 @@ import path from 'path';
 const PRISMA_SCHEMA_VERSION = 7;
 
 declare global {
-  // eslint-disable-next-line no-var
   var prismaV2: PrismaClient | undefined;
-  // eslint-disable-next-line no-var
   var prismaSchemaVersion: number | undefined;
 }
 
