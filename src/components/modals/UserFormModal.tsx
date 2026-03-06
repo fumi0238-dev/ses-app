@@ -15,7 +15,7 @@ export default function UserFormModal({ user, currentUserId, onClose, onSuccess 
   const isEdit = !!user;
   const [email, setEmail] = useState(user?.email ?? '');
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
-  const [role, setRole] = useState(user?.role ?? 'user');
+  const [role, setRole] = useState<string>(user?.role ?? 'user');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

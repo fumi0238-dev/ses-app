@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { FaSearch, FaList, FaThLarge } from 'react-icons/fa';
 import { useStore } from '@/lib/store';
-import { GeneralTask, GENERAL_TASK_STATUSES, TASK_PRIORITIES } from '@/lib/types';
+import { GeneralTask, GeneralTaskStatus, GENERAL_TASK_STATUSES, TASK_PRIORITIES } from '@/lib/types';
 import TaskListView from './TaskListView';
 import TaskBoardView from './TaskBoardView';
 import TaskDetailPanel from './TaskDetailPanel';
@@ -71,7 +71,7 @@ export default function TasksPage() {
     store.updateGeneralTask(id, { status: currentStatus === '完了' ? '未着手' : '完了' });
   }, [store]);
 
-  const handleUpdateStatus = useCallback((id: string, status: string) => {
+  const handleUpdateStatus = useCallback((id: string, status: GeneralTaskStatus) => {
     store.updateGeneralTask(id, { status });
   }, [store]);
 

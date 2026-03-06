@@ -11,23 +11,23 @@ async function main() {
   const prisma = new PrismaClient({ adapter } as any);
 
   const existing = await prisma.user.findUnique({
-    where: { username: 'admin' },
+    where: { email: 'admin@ses-app.local' },
   });
 
   if (!existing) {
     const passwordHash = await hashPassword('admin123');
     await prisma.user.create({
       data: {
-        username: 'admin',
+        email: 'admin@ses-app.local',
         password_hash: passwordHash,
-        display_name: '増井',
+        display_name: '管理者',
         role: 'admin',
         is_active: true,
         created_at: BigInt(Date.now()),
         updated_at: BigInt(Date.now()),
       },
     });
-    console.log('Admin user created: admin / admin123');
+    console.log('Admin user created: admin@ses-app.local / admin123');
   } else {
     console.log('Admin user already exists, skipping.');
   }

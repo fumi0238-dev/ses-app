@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { FaCheck, FaPlus, FaChevronDown, FaChevronRight, FaPen, FaTrash, FaRegCalendarAlt } from 'react-icons/fa';
-import { GeneralTask, TaskSection, GENERAL_TASK_STATUSES, TASK_PRIORITIES } from '@/lib/types';
+import { GeneralTask, GeneralTaskStatus, TaskPriority, TaskSection, GENERAL_TASK_STATUSES, TASK_PRIORITIES } from '@/lib/types';
 import { getTaskDueStatus } from '@/lib/helpers';
 
 interface Props {
@@ -128,7 +128,7 @@ function SubtaskRow({ sub, depth, onToggle, onSelectParent, onUpdate, onDelete, 
           <select
             className={`task-progress-select ${sub.status === '未着手' ? 'status-todo' : sub.status === '対応中' ? 'status-doing' : sub.status === '待ち' ? 'status-waiting' : 'status-done'}`}
             value={sub.status}
-            onChange={e => onUpdate(sub.id, { status: e.target.value })}
+            onChange={e => onUpdate(sub.id, { status: e.target.value as GeneralTaskStatus })}
           >
             {GENERAL_TASK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -185,7 +185,7 @@ function SubtaskRow({ sub, depth, onToggle, onSelectParent, onUpdate, onDelete, 
           <select
             className={`task-progress-select ${sub.priority === '高' ? 'priority-high' : sub.priority === '中' ? 'priority-medium' : sub.priority === '低' ? 'priority-low' : 'priority-none'}`}
             value={sub.priority}
-            onChange={e => onUpdate(sub.id, { priority: e.target.value })}
+            onChange={e => onUpdate(sub.id, { priority: e.target.value as TaskPriority })}
           >
             {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
@@ -370,7 +370,7 @@ function TaskRow({ task, onSelect, selected, onToggle, onUpdate, onDelete, onAdd
           <select
             className={`task-progress-select ${task.status === '未着手' ? 'status-todo' : task.status === '対応中' ? 'status-doing' : task.status === '待ち' ? 'status-waiting' : 'status-done'}`}
             value={task.status}
-            onChange={e => onUpdate(task.id, { status: e.target.value })}
+            onChange={e => onUpdate(task.id, { status: e.target.value as GeneralTaskStatus })}
           >
             {GENERAL_TASK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -427,7 +427,7 @@ function TaskRow({ task, onSelect, selected, onToggle, onUpdate, onDelete, onAdd
           <select
             className={`task-progress-select ${task.priority === '高' ? 'priority-high' : task.priority === '中' ? 'priority-medium' : task.priority === '低' ? 'priority-low' : 'priority-none'}`}
             value={task.priority}
-            onChange={e => onUpdate(task.id, { priority: e.target.value })}
+            onChange={e => onUpdate(task.id, { priority: e.target.value as TaskPriority })}
           >
             {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>

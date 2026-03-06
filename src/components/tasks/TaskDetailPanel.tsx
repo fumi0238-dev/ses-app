@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FaTimes, FaCheck, FaPlus, FaTrash } from 'react-icons/fa';
-import { GeneralTask, TaskComment, TaskTag, TaskSection, GENERAL_TASK_STATUSES, TASK_PRIORITIES, TAG_COLORS, TagColor } from '@/lib/types';
+import { GeneralTask, GeneralTaskStatus, TaskPriority, TaskComment, TaskTag, TaskSection, GENERAL_TASK_STATUSES, TASK_PRIORITIES, TAG_COLORS, TagColor } from '@/lib/types';
 import { formatDate } from '@/lib/helpers';
 
 interface Props {
@@ -120,7 +120,7 @@ export default function TaskDetailPanel({
           <div className="td-field">
             <span className="td-field-label">ステータス</span>
             <div className="td-field-value">
-              <select value={task.status} onChange={e => onUpdate(task.id, { status: e.target.value })}>
+              <select value={task.status} onChange={e => onUpdate(task.id, { status: e.target.value as GeneralTaskStatus })}>
                 {GENERAL_TASK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -154,7 +154,7 @@ export default function TaskDetailPanel({
           <div className="td-field">
             <span className="td-field-label">優先度</span>
             <div className="td-field-value">
-              <select value={task.priority} onChange={e => onUpdate(task.id, { priority: e.target.value })}>
+              <select value={task.priority} onChange={e => onUpdate(task.id, { priority: e.target.value as TaskPriority })}>
                 {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>

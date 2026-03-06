@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { GeneralTask, GENERAL_TASK_STATUSES } from '@/lib/types';
+import { GeneralTask, GeneralTaskStatus, GENERAL_TASK_STATUSES } from '@/lib/types';
 import { getTaskDueStatus } from '@/lib/helpers';
 
 interface Props {
   tasks: GeneralTask[];
   onSelectTask: (id: string) => void;
-  onUpdateStatus: (id: string, status: string) => void;
+  onUpdateStatus: (id: string, status: GeneralTaskStatus) => void;
   onAddTask: (data: Partial<GeneralTask>) => Promise<GeneralTask>;
 }
 
@@ -40,14 +40,14 @@ export default function TaskBoardView({ tasks, onSelectTask, onUpdateStatus, onA
     setDragOverCol(status);
   };
 
-  const handleDrop = (e: React.DragEvent, status: string) => {
+  const handleDrop = (e: React.DragEvent, status: GeneralTaskStatus) => {
     e.preventDefault();
     if (dragTaskId) onUpdateStatus(dragTaskId, status);
     setDragTaskId(null);
     setDragOverCol(null);
   };
 
-  const handleAdd = async (status: string) => {
+  const handleAdd = async (status: GeneralTaskStatus) => {
     if (!newTitle.trim()) return;
     await onAddTask({ title: newTitle.trim(), status });
     setNewTitle('');
