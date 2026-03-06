@@ -29,7 +29,7 @@ interface Props {
 
 /* -------- TaskChecklist sub-component -------- */
 function TaskChecklist({
-  matchingId, status, tasks, onAdd, onUpdate, onDelete, onBulkAdd,
+  matchingId, status: _status, tasks, onAdd, onUpdate, onDelete, onBulkAdd: _onBulkAdd,
 }: {
   matchingId: string;
   status: string;
@@ -109,15 +109,6 @@ function TaskChecklist({
     setEditingNoteId(null);
   };
 
-  const handleNoteKeyDown = (e: React.KeyboardEvent, taskId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleNoteSave(taskId);
-    } else if (e.key === 'Escape') {
-      setEditingNoteId(null);
-    }
-  };
-
   const handleAssigneeSave = async (taskId: string) => {
     try {
       await onUpdate(taskId, { assignee: editingAssigneeText });
@@ -162,7 +153,7 @@ function TaskChecklist({
                   value={editingAssigneeText}
                   onChange={e => setEditingAssigneeText(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); handleAssigneeSave(task.id); }
+                    if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
                     if (e.key === 'Escape') setEditingAssigneeId(null);
                   }}
                   onBlur={() => handleAssigneeSave(task.id)}
@@ -190,7 +181,7 @@ function TaskChecklist({
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleNoteSave(task.id);
+                      (e.target as HTMLTextAreaElement).blur();
                     } else if (e.key === 'Escape') {
                       setEditingNoteId(null);
                     }
@@ -703,8 +694,7 @@ export default function ProgressPage({
                           onKeyDown={e => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              onUpdateMatchingField(mt.id, { note: editingMemoText });
-                              setEditingMemoId(null);
+                              (e.target as HTMLTextAreaElement).blur();
                             }
                             if (e.key === 'Escape') setEditingMemoId(null);
                           }}

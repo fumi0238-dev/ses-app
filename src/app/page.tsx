@@ -100,31 +100,39 @@ function AuthenticatedApp() {
   const handleEditProject = (p: Project) => setProjectFormData(p);
   const handleDeleteProject = async (id: string) => {
     if (!confirm('この案件を削除しますか？')) return;
-    await store.deleteProject(id);
-    store.logActivity('案件削除', 'projects', id, '', '');
-    showToast('案件を削除しました');
+    try {
+      await store.deleteProject(id);
+      store.logActivity('案件削除', 'projects', id, '', '');
+      showToast('案件を削除しました');
+    } catch (e) { console.error(e); showToast('案件の削除に失敗しました'); }
   };
   const handleSaveProject = async (data: Omit<Project, 'id'>, id?: string) => {
-    if (id) {
-      await store.updateProject(id, data);
-      store.logActivity('案件更新', 'projects', id, data.project_name_rewrite || data.project_name_original, '');
-      showToast('案件を更新しました');
-    } else {
-      const created = await store.addProject(data);
-      store.logActivity('案件追加', 'projects', created.id, data.project_name_rewrite || data.project_name_original, '');
-      showToast('案件を追加しました');
-    }
-    setProjectFormData(null);
+    try {
+      if (id) {
+        await store.updateProject(id, data);
+        store.logActivity('案件更新', 'projects', id, data.project_name_rewrite || data.project_name_original, '');
+        showToast('案件を更新しました');
+      } else {
+        const created = await store.addProject(data);
+        store.logActivity('案件追加', 'projects', created.id, data.project_name_rewrite || data.project_name_original, '');
+        showToast('案件を追加しました');
+      }
+      setProjectFormData(null);
+    } catch (e) { console.error(e); showToast('案件の保存に失敗しました'); }
   };
   const handleBulkUpdateProjects = async (ids: string[], updates: Partial<Project>) => {
-    await store.bulkUpdateProjects(ids, updates);
-    store.logActivity('一括更新', 'projects', '', `${ids.length}件`, '');
-    showToast(`${ids.length}件を更新しました`);
+    try {
+      await store.bulkUpdateProjects(ids, updates);
+      store.logActivity('一括更新', 'projects', '', `${ids.length}件`, '');
+      showToast(`${ids.length}件を更新しました`);
+    } catch (e) { console.error(e); showToast('一括更新に失敗しました'); }
   };
   const handleBulkDeleteProjects = async (ids: string[]) => {
-    await store.bulkDeleteProjects(ids);
-    store.logActivity('一括削除', 'projects', '', `${ids.length}件`, '');
-    showToast(`${ids.length}件の案件を削除しました`);
+    try {
+      await store.bulkDeleteProjects(ids);
+      store.logActivity('一括削除', 'projects', '', `${ids.length}件`, '');
+      showToast(`${ids.length}件の案件を削除しました`);
+    } catch (e) { console.error(e); showToast('一括削除に失敗しました'); }
   };
 
   // ---- Member handlers ----
@@ -132,32 +140,40 @@ function AuthenticatedApp() {
   const handleEditMember = (m: Member) => setMemberFormData(m);
   const handleDeleteMember = async (id: string) => {
     if (!confirm('この要員を削除しますか？')) return;
-    await store.deleteMember(id);
-    store.logActivity('要員削除', 'members', id, '', '');
-    showToast('要員を削除しました');
+    try {
+      await store.deleteMember(id);
+      store.logActivity('要員削除', 'members', id, '', '');
+      showToast('要員を削除しました');
+    } catch (e) { console.error(e); showToast('要員の削除に失敗しました'); }
   };
   const handleSaveMember = async (data: Omit<Member, 'id'>, id?: string) => {
-    if (id) {
-      await store.updateMember(id, data);
-      store.logActivity('要員更新', 'members', id, data.full_name || data.initial, '');
-      showToast('要員を更新しました');
-    } else {
-      const created = await store.addMember(data);
-      store.logActivity('要員追加', 'members', created.id, data.full_name || data.initial, '');
-      showToast('要員を追加しました');
-    }
-    setMemberFormData(null);
+    try {
+      if (id) {
+        await store.updateMember(id, data);
+        store.logActivity('要員更新', 'members', id, data.full_name || data.initial, '');
+        showToast('要員を更新しました');
+      } else {
+        const created = await store.addMember(data);
+        store.logActivity('要員追加', 'members', created.id, data.full_name || data.initial, '');
+        showToast('要員を追加しました');
+      }
+      setMemberFormData(null);
+    } catch (e) { console.error(e); showToast('要員の保存に失敗しました'); }
   };
   const handleBulkDeleteMembers = async (ids: string[]) => {
-    await store.bulkDeleteMembers(ids);
-    store.logActivity('一括削除', 'members', '', `${ids.length}件`, '');
-    showToast(`${ids.length}件の要員を削除しました`);
+    try {
+      await store.bulkDeleteMembers(ids);
+      store.logActivity('一括削除', 'members', '', `${ids.length}件`, '');
+      showToast(`${ids.length}件の要員を削除しました`);
+    } catch (e) { console.error(e); showToast('一括削除に失敗しました'); }
   };
   const handleMemberProcessChange = async (id: string, process: MemberProcess) => {
-    await store.updateMember(id, { process });
-    const m = store.members.find(x => x.id === id);
-    store.logActivity('プロセス変更', 'members', id, m?.full_name || m?.initial || '', process);
-    showToast(`プロセスを「${process}」に変更しました`);
+    try {
+      await store.updateMember(id, { process });
+      const m = store.members.find(x => x.id === id);
+      store.logActivity('プロセス変更', 'members', id, m?.full_name || m?.initial || '', process);
+      showToast(`プロセスを「${process}」に変更しました`);
+    } catch (e) { console.error(e); showToast('プロセス変更に失敗しました'); }
   };
 
   // ---- Matching handlers ----
@@ -169,29 +185,37 @@ function AuthenticatedApp() {
   };
   const handleDeleteMatching = async (id: string) => {
     if (!confirm('このマッチングを削除しますか？')) return;
-    await store.deleteMatching(id);
-    store.logActivity('マッチング削除', 'matchings', id, '', '');
-    showToast('マッチングを削除しました');
+    try {
+      await store.deleteMatching(id);
+      store.logActivity('マッチング削除', 'matchings', id, '', '');
+      showToast('マッチングを削除しました');
+    } catch (e) { console.error(e); showToast('マッチングの削除に失敗しました'); }
   };
   const handleBulkDeleteMatchings = async (ids: string[]) => {
-    await store.bulkDeleteMatchings(ids);
-    store.logActivity('一括削除', 'matchings', '', `${ids.length}件`, '');
-    showToast(`${ids.length}件のマッチングを削除しました`);
+    try {
+      await store.bulkDeleteMatchings(ids);
+      store.logActivity('一括削除', 'matchings', '', `${ids.length}件`, '');
+      showToast(`${ids.length}件のマッチングを削除しました`);
+    } catch (e) { console.error(e); showToast('一括削除に失敗しました'); }
   };
   const handleSaveMatching = async (data: Omit<Matching, 'id'>, id?: string) => {
-    if (id) {
-      await store.updateMatching(id, data);
-      store.logActivity('マッチング更新', 'matchings', id, '', data.status);
-      showToast('マッチングを更新しました');
-    } else {
-      const created = await store.addMatching(data);
-      store.logActivity('マッチング登録', 'matchings', created.id, '', data.status);
-      showToast('マッチングを登録しました');
-    }
-    setMatchingFormData(null);
+    try {
+      if (id) {
+        await store.updateMatching(id, data);
+        store.logActivity('マッチング更新', 'matchings', id, '', data.status);
+        showToast('マッチングを更新しました');
+      } else {
+        const created = await store.addMatching(data);
+        store.logActivity('マッチング登録', 'matchings', created.id, '', data.status);
+        showToast('マッチングを登録しました');
+      }
+      setMatchingFormData(null);
+    } catch (e) { console.error(e); showToast('マッチングの保存に失敗しました'); }
   };
   const handleUpdateMatchingField = async (id: string, data: Partial<Matching>) => {
-    await store.updateMatching(id, data);
+    try {
+      await store.updateMatching(id, data);
+    } catch (e) { console.error(e); showToast('更新に失敗しました'); }
   };
 
   const handleQuickStatusUpdate = async (id: string, status: string) => {

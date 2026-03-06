@@ -6,7 +6,7 @@ import {
   FaEdit, FaTrash, FaEye, FaPlus, FaRegCalendarAlt,
 } from 'react-icons/fa';
 import { Project, Member, Matching, MATCHING_STATUSES } from '../lib/types';
-import { truncate, getMatchingBadgeClass, formatDateStr } from '../lib/helpers';
+import { truncate, formatDateStr } from '../lib/helpers';
 import { doMatching } from '../lib/matching';
 
 interface Props {
