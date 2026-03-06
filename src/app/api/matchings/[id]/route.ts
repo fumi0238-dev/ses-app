@@ -33,9 +33,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const now = BigInt(Date.now());
+    // マッチング削除 + 関連タスクもカスケード削除
+    await prisma.task.deleteMany({
+      where: { matching_id: id },
+    });
     await prisma.matching.update({
       where: { id },
-      data: { deleted: true, updated_at: BigInt(Date.now()) },
+      data: { deleted: true, updated_at: now },
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

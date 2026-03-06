@@ -28,6 +28,7 @@ export default function TaskDetailPanel({
 }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
+  const [assignee, setAssignee] = useState(task.assignee);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
@@ -42,6 +43,7 @@ export default function TaskDetailPanel({
     setPrevTaskId(task.id);
     setTitle(task.title);
     setDescription(task.description);
+    setAssignee(task.assignee);
   }
 
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function TaskDetailPanel({
 
   const saveTitle = () => { if (title !== task.title) onUpdate(task.id, { title }); };
   const saveDesc = () => { if (description !== task.description) onUpdate(task.id, { description }); };
+  const saveAssignee = () => { if (assignee !== task.assignee) onUpdate(task.id, { assignee }); };
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -131,8 +134,10 @@ export default function TaskDetailPanel({
             <span className="td-field-label">担当者</span>
             <div className="td-field-value">
               <input
-                value={task.assignee}
-                onChange={e => onUpdate(task.id, { assignee: e.target.value })}
+                value={assignee}
+                onChange={e => setAssignee(e.target.value)}
+                onBlur={saveAssignee}
+                onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                 placeholder="担当者名"
               />
             </div>

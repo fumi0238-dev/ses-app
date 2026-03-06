@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { safeParseFloat, safeParseInt } from '@/lib/helpers';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,7 +16,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         initial: body.initial,
         contract_employee: body.contract_employee,
         desired_price: body.desired_price,
-        desired_price_num: body.desired_price_num ? parseFloat(body.desired_price_num) : null,
+        desired_price_num: safeParseFloat(body.desired_price_num),
         contact: body.contact,
         desired_position: body.desired_position,
         skill_sheet_url: body.skill_sheet_url,
@@ -24,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         skills_summary: body.skills_summary,
         skill_tags: body.skill_tags,
         industry_tags: body.industry_tags,
-        experience_years: body.experience_years ? parseFloat(body.experience_years) : null,
+        experience_years: safeParseFloat(body.experience_years),
         experience_summary: body.experience_summary,
         nearest_station: body.nearest_station,
         available_date: body.available_date,
@@ -32,8 +33,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         work_preference: body.work_preference,
         shareable: body.shareable,
         share_note: body.share_note,
-        desired_price_min: body.desired_price_min !== undefined ? (body.desired_price_min ? parseInt(body.desired_price_min) : null) : undefined,
-        desired_price_max: body.desired_price_max !== undefined ? (body.desired_price_max ? parseInt(body.desired_price_max) : null) : undefined,
+        desired_price_min: body.desired_price_min !== undefined ? safeParseInt(body.desired_price_min) : undefined,
+        desired_price_max: body.desired_price_max !== undefined ? safeParseInt(body.desired_price_max) : undefined,
         work_style_category: body.work_style_category !== undefined ? body.work_style_category : undefined,
         work_style_office_days: body.work_style_office_days !== undefined ? body.work_style_office_days : undefined,
         work_style_initial_onsite: body.work_style_initial_onsite !== undefined ? body.work_style_initial_onsite : undefined,
@@ -58,9 +59,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const now = BigInt(Date.now());
+    // 要員を削除 + 関連マッチングもカスケード削除
+    const relatedMatchings = await prisma.matching.findMany({
+      where: { member_id: id, deleted: false },
+      select: { id: true },
+    });
+    if (relatedMatchings.length > 0) {
+      const matchingIds = relatedMatchings.map(m => m.id);
+      // 関連タスクも削除
+      await prisma.task.deleteMany({
+        where: { matching_id: { in: matchingIds } },
+      });
+      await prisma.matching.updateMany({
+        where: { id: { in: matchingIds } },
+        data: { deleted: true, updated_at: now },
+      });
+    }
     await prisma.member.update({
       where: { id },
-      data: { deleted: true, updated_at: BigInt(Date.now()) },
+      data: { deleted: true, updated_at: now },
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { safeParseFloat, safeParseInt } from '@/lib/helpers';
 
 export async function GET() {
   try {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
         initial: body.initial ?? '',
         contract_employee: body.contract_employee ?? '',
         desired_price: body.desired_price ?? '',
-        desired_price_num: body.desired_price_num ? parseFloat(body.desired_price_num) : null,
+        desired_price_num: safeParseFloat(body.desired_price_num),
         contact: body.contact ?? '',
         desired_position: body.desired_position ?? '',
         skill_sheet_url: body.skill_sheet_url ?? '',
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
         skills_summary: body.skills_summary ?? '',
         skill_tags: body.skill_tags ?? '',
         industry_tags: body.industry_tags ?? '',
-        experience_years: body.experience_years ? parseFloat(body.experience_years) : null,
+        experience_years: safeParseFloat(body.experience_years),
         experience_summary: body.experience_summary ?? '',
         nearest_station: body.nearest_station ?? '',
         available_date: body.available_date ?? '',
@@ -50,8 +51,8 @@ export async function POST(req: NextRequest) {
         work_preference: body.work_preference ?? '',
         shareable: body.shareable ?? '',
         share_note: body.share_note ?? '',
-        desired_price_min: body.desired_price_min ? parseInt(body.desired_price_min) : null,
-        desired_price_max: body.desired_price_max ? parseInt(body.desired_price_max) : null,
+        desired_price_min: safeParseInt(body.desired_price_min),
+        desired_price_max: safeParseInt(body.desired_price_max),
         work_style_category: body.work_style_category ?? null,
         work_style_office_days: body.work_style_office_days ?? null,
         work_style_initial_onsite: body.work_style_initial_onsite ?? false,

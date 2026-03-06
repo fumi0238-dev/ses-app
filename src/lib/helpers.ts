@@ -1,5 +1,19 @@
 import { MemberProcess, MatchingStatus, RequiredFieldDef } from './types';
 
+/** parseFloat の安全版。NaN になる場合は null を返す */
+export function safeParseFloat(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const num = typeof value === 'number' ? value : parseFloat(String(value));
+  return isNaN(num) ? null : num;
+}
+
+/** parseInt の安全版。NaN になる場合は null を返す */
+export function safeParseInt(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const num = typeof value === 'number' ? value : parseInt(String(value), 10);
+  return isNaN(num) ? null : num;
+}
+
 export function truncate(str: string | undefined | null, len: number): string {
   if (!str) return '-';
   return str.length > len ? str.substring(0, len) + '...' : str;

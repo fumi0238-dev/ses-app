@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { safeParseFloat, safeParseInt } from '@/lib/helpers';
 
 export async function GET() {
   try {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
         project_name_rewrite: body.project_name_rewrite ?? '',
         client_price: body.client_price ?? '',
         purchase_price: body.purchase_price ?? '',
-        purchase_price_num: body.purchase_price_num ? parseFloat(body.purchase_price_num) : null,
+        purchase_price_num: safeParseFloat(body.purchase_price_num),
         role: body.role ?? '',
         location: body.location ?? '',
         work_style: body.work_style ?? '',
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
         required_skill_tags: body.required_skill_tags ?? '',
         preferred_skill_tags: body.preferred_skill_tags ?? '',
         industry_tags: body.industry_tags ?? '',
-        required_experience_years: body.required_experience_years ? parseFloat(body.required_experience_years) : null,
+        required_experience_years: safeParseFloat(body.required_experience_years),
         description_original: body.description_original ?? '',
         description_rewrite: body.description_rewrite ?? '',
         age_limit: body.age_limit ?? '',
@@ -55,10 +56,10 @@ export async function POST(req: NextRequest) {
         english: body.english ?? '',
         commercial_flow: body.commercial_flow ?? '',
         interview_count: body.interview_count ?? '',
-        client_price_min: body.client_price_min ? parseInt(body.client_price_min) : null,
-        client_price_max: body.client_price_max ? parseInt(body.client_price_max) : null,
-        purchase_price_min: body.purchase_price_min ? parseInt(body.purchase_price_min) : null,
-        purchase_price_max: body.purchase_price_max ? parseInt(body.purchase_price_max) : null,
+        client_price_min: safeParseInt(body.client_price_min),
+        client_price_max: safeParseInt(body.client_price_max),
+        purchase_price_min: safeParseInt(body.purchase_price_min),
+        purchase_price_max: safeParseInt(body.purchase_price_max),
         work_style_category: body.work_style_category ?? null,
         work_style_office_days: body.work_style_office_days ?? null,
         work_style_initial_onsite: body.work_style_initial_onsite ?? false,

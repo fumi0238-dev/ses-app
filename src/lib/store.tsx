@@ -81,7 +81,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [proj, mem, match, logs, nt, tk, gt, ts, tt, usrs] = await Promise.all([
+        const results = await Promise.allSettled([
           fetch('/api/projects').then(r => { if (!r.ok) throw new Error('projects'); return r.json(); }),
           fetch('/api/members').then(r => { if (!r.ok) throw new Error('members'); return r.json(); }),
           fetch('/api/matchings').then(r => { if (!r.ok) throw new Error('matchings'); return r.json(); }),
@@ -93,16 +93,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           fetch('/api/task-tags').then(r => { if (!r.ok) throw new Error('task-tags'); return r.json(); }),
           fetch('/api/users').then(r => { if (!r.ok) throw new Error('users'); return r.json(); }),
         ]);
-        setProjects(proj);
-        setMembers(mem);
-        setMatchings(match);
-        setActivityLogs(logs);
-        setNotes(nt);
-        setTasks(tk);
-        setGeneralTasks(gt);
-        setTaskSections(ts);
-        setTaskTags(tt);
-        setUsers(usrs);
+        // 成功したものだけセット、失敗は個別にログ出力
+        const setters = [setProjects, setMembers, setMatchings, setActivityLogs, setNotes, setTasks, setGeneralTasks, setTaskSections, setTaskTags, setUsers];
+        const names = ['projects', 'members', 'matchings', 'activity-logs', 'notes', 'tasks', 'general-tasks', 'task-sections', 'task-tags', 'users'];
+        results.forEach((result, i) => {
+          if (result.status === 'fulfilled') {
+            setters[i](result.value);
+          } else {
+            console.error(`Failed to load ${names[i]}:`, result.reason);
+          }
+        });
       } catch (e) {
         console.error('Failed to load initial data:', e);
       } finally {
@@ -329,36 +329,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Import
   const importRecords = useCallback(async (table: 'projects' | 'members', records: Record<string, string>[], mode: 'append' | 'replace'): Promise<number> => {
+    const url = table === 'projects' ? '/api/projects' : '/api/members';
+
     if (mode === 'replace') {
+      // まず新しいレコードを作成（失敗したら元データは消さない）
+      const created = await Promise.all(
+        records.map(r =>
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(r),
+          }).then(res => {
+            if (!res.ok) throw new Error(`Failed to create record`);
+            return res.json();
+          })
+        )
+      );
+
+      // 新規作成が全て成功したら、古いデータを削除
       if (table === 'projects') {
         const current = await fetch('/api/projects').then(r => r.json()) as Project[];
-        await Promise.all(current.map(p => fetch(`/api/projects/${p.id}`, { method: 'DELETE' })));
-      } else {
-        const current = await fetch('/api/members').then(r => r.json()) as Member[];
-        await Promise.all(current.map(m => fetch(`/api/members/${m.id}`, { method: 'DELETE' })));
-      }
-    }
-
-    const url = table === 'projects' ? '/api/projects' : '/api/members';
-    const created = await Promise.all(
-      records.map(r =>
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(r),
-        }).then(res => res.json())
-      )
-    );
-
-    if (table === 'projects') {
-      if (mode === 'replace') {
+        const newIds = new Set((created as Project[]).map(c => c.id));
+        const toDelete = current.filter(p => !newIds.has(p.id));
+        await Promise.all(toDelete.map(p => fetch(`/api/projects/${p.id}`, { method: 'DELETE' })));
         setProjects(created as Project[]);
       } else {
-        setProjects(prev => [...prev, ...(created as Project[])]);
+        const current = await fetch('/api/members').then(r => r.json()) as Member[];
+        const newIds = new Set((created as Member[]).map(c => c.id));
+        const toDelete = current.filter(m => !newIds.has(m.id));
+        await Promise.all(toDelete.map(m => fetch(`/api/members/${m.id}`, { method: 'DELETE' })));
+        setMembers(created as Member[]);
       }
     } else {
-      if (mode === 'replace') {
-        setMembers(created as Member[]);
+      // append モード
+      const created = await Promise.all(
+        records.map(r =>
+          fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(r),
+          }).then(res => {
+            if (!res.ok) throw new Error(`Failed to create record`);
+            return res.json();
+          })
+        )
+      );
+
+      if (table === 'projects') {
+        setProjects(prev => [...prev, ...(created as Project[])]);
       } else {
         setMembers(prev => [...prev, ...(created as Member[])]);
       }
