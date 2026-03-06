@@ -166,7 +166,7 @@ model Note {
 
 model User {
   id            String  @id @default(uuid())
-  username      String  @unique
+  email         String  @unique
   password_hash String
   display_name  String
   role          String  @default("user")

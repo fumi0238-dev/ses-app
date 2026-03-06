@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useState, FormEvent } from 'react';
-import { FaBolt, FaUser, FaLock, FaSignInAlt } from 'react-icons/fa';
+import { FaBolt, FaEnvelope, FaLock, FaSignInAlt } from 'react-icons/fa';
 import { useAuth } from '../lib/auth-context';
 
 export default function Login() {
   const { login, loading, error } = useAuth();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    await login(username, password);
+    await login(email, password);
   };
 
   return (
@@ -25,12 +25,12 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="login-field">
-            <FaUser className="login-field-icon" />
+            <FaEnvelope className="login-field-icon" />
             <input
-              type="text"
-              placeholder="ユーザー名"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
+              type="email"
+              placeholder="メールアドレス"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
               autoFocus
               disabled={loading}
             />
@@ -51,7 +51,7 @@ export default function Login() {
           <button
             type="submit"
             className="btn btn-primary login-submit"
-            disabled={loading || !username || !password}
+            disabled={loading || !email || !password}
           >
             {loading ? 'ログイン中...' : (
               <>
