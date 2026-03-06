@@ -3,7 +3,7 @@ export type UserRole = typeof USER_ROLES[number];
 
 export interface User {
   id: string;
-  username: string;
+  email: string;
   display_name: string;
   role: UserRole;
 }
@@ -197,7 +197,13 @@ export interface TaskComment {
   created_at: number;
 }
 
-export type PageName = 'dashboard' | 'projects' | 'members' | 'matching' | 'progress' | 'tasks';
+export type PageName = 'dashboard' | 'projects' | 'members' | 'matching' | 'progress' | 'tasks' | 'user-management';
+
+export interface UserAdmin extends User {
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 // --- Required Fields Config ---
 // 一覧で「未入力あり」バッジを表示するための必須項目定義。

@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   FaBolt, FaChartPie, FaBriefcase, FaUsers, FaHandshake, FaUser, FaBars,
-  FaClipboardList, FaCheckSquare, FaSignOutAlt, FaLock, FaChevronUp,
+  FaClipboardList, FaCheckSquare, FaSignOutAlt, FaLock, FaChevronUp, FaUsersCog,
 } from 'react-icons/fa';
 import { TbLayoutSidebarLeftCollapse, TbLayoutSidebarLeftExpand } from 'react-icons/tb';
 
@@ -20,6 +20,7 @@ import Members from '../components/Members';
 import MatchingPage from '../components/Matching';
 import ProgressPage from '../components/Progress';
 import TasksPage from '../components/tasks/TasksPage';
+import UserManagement from '../components/UserManagement';
 
 import ProjectFormModal from '../components/modals/ProjectFormModal';
 import MemberFormModal from '../components/modals/MemberFormModal';
@@ -91,6 +92,7 @@ function AuthenticatedApp() {
     matching: 'マッチング',
     progress: '進捗管理',
     tasks: 'タスク管理',
+    'user-management': 'ユーザー管理',
   };
 
   // ---- Project handlers ----
@@ -295,6 +297,16 @@ function AuthenticatedApp() {
               <span className="sidebar-label">{label}</span>
             </button>
           ))}
+          {user?.role === 'admin' && (
+            <button
+              className={`nav-item${currentPage === 'user-management' ? ' active' : ''}`}
+              onClick={() => navigate('user-management')}
+              title={sidebarCollapsed ? 'ユーザー管理' : undefined}
+            >
+              <FaUsersCog style={{ fontSize: 16 }} />
+              <span className="sidebar-label">ユーザー管理</span>
+            </button>
+          )}
         </nav>
         <div className="sidebar-footer" ref={userMenuRef}>
           <button
@@ -436,6 +448,12 @@ function AuthenticatedApp() {
         )}
         {!store.loading && currentPage === 'tasks' && (
           <TasksPage />
+        )}
+        {!store.loading && currentPage === 'user-management' && user?.role === 'admin' && (
+          <UserManagement
+            currentUserId={user.id}
+            onToast={showToast}
+          />
         )}
       </main>
 

@@ -10,7 +10,7 @@ interface AuthContextType {
   initialized: boolean;
   loading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -31,14 +31,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setInitialized(true);
   }, []);
 
-  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
         const data = await res.json();

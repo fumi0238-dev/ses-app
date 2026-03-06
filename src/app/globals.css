@@ -2120,7 +2120,7 @@ select.process-select:focus {
 /* ==================== General Task Management (Asana-like) ==================== */
 
 /* Page layout */
-.tasks-page { position: relative; }
+.tasks-page { position: relative; padding: 24px 28px; }
 .tasks-toolbar {
     display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
 }
